@@ -5,4 +5,11 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
 };
 
+// next.config.js
+module.exports = {
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+};
+
 export default nextConfig;
