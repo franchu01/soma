@@ -11,7 +11,8 @@ db.prepare(`
     name TEXT NOT NULL,
     created_at TEXT NOT NULL,
     activo INTEGER NOT NULL DEFAULT 1,
-    recordatorio INTEGER DEFAULT 1
+    recordatorio INTEGER DEFAULT 1,
+    sede TEXT NOT NULL
   );
 `).run();
 

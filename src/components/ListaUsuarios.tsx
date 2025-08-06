@@ -5,6 +5,7 @@ type Usuario = {
   email: string;
   created_at: string;
   recordatorio: string;
+  sede:string;
 };
 
 type Pagos = Record<string, string[]>;
@@ -21,6 +22,8 @@ export default function ListaUsuarios() {
   const [estado, setEstado] = useState<'activos' | 'todos'>('activos');
   const [busqueda, setBusqueda] = useState('');
   const [bajas, setBajas] = useState<Record<string, string[]>>({});
+  const [sede, setSede] = useState<'todos' | 'Temperley' | 'Calzada'>('todos');
+
 
   const mesActual = obtenerMesActual();
 
@@ -49,6 +52,8 @@ export default function ListaUsuarios() {
     if (estado === 'activos' && enBaja) return false;
     if (filtro === 'deuda' && !enDeuda) return false;
     if (busqueda && !u.name.toLowerCase().includes(busqueda.toLowerCase())) return false;
+    if (sede !== 'todos' && u.sede !== sede) return false;
+
     return true;
   });
 
@@ -107,6 +112,17 @@ export default function ListaUsuarios() {
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
         />
+
+        <select
+          className="border p-1 rounded text-gray-800"
+          value={sede}
+          onChange={(e) => setSede(e.target.value as 'todos' | 'Temperley' | 'Calzada')}
+        >
+          <option value="todos">Todas las sedes</option>
+          <option value="Temperley">Temperley</option>
+          <option value="Calzada">Calzada</option>
+        </select>
+
       </div>
 
       <table className="w-full text-left border mt-4">

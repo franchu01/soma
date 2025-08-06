@@ -12,28 +12,33 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   if (method === 'POST') {
-    const { name, email, recordatorio } = req.body;
+  const { name, email, recordatorio, sede } = req.body;
 
-    // Verificar si ya existe el email
-    const existeEmail = db.prepare('SELECT 1 FROM usuarios WHERE email = ?').get(email);
-    if (existeEmail) {
-      return res.status(409).json({ error: 'Este email ya está registrado' });
-    }
-
-    // Verificar si ya existe el mismo nombre
-    const existeNombre = db.prepare('SELECT 1 FROM usuarios WHERE name = ?').get(name);
-    if (existeNombre) {
-      return res.status(409).json({ error: 'Este nombre y apellido ya está registrado' });
-    }
-
-    const created_at = new Date().toISOString().split('T')[0];
-    db.prepare(`
-      INSERT INTO usuarios (email, name, created_at, recordatorio)
-      VALUES (?, ?, ?, ?)
-    `).run(email, name, created_at, recordatorio);
-
-    return res.status(200).json({ success: true });
+  if (!name || !email || !recordatorio || !sede) {
+    return res.status(400).json({ error: 'Faltan datos requeridos' });
   }
+
+  // Verificar si ya existe el email
+  const existeEmail = db.prepare('SELECT 1 FROM usuarios WHERE email = ?').get(email);
+  if (existeEmail) {
+    return res.status(409).json({ error: 'Este email ya está registrado' });
+  }
+
+  // Verificar si ya existe el mismo nombre
+  const existeNombre = db.prepare('SELECT 1 FROM usuarios WHERE name = ?').get(name);
+  if (existeNombre) {
+    return res.status(409).json({ error: 'Este nombre y apellido ya está registrado' });
+  }
+
+  const created_at = new Date().toISOString().split('T')[0];
+  db.prepare(`
+    INSERT INTO usuarios (email, name, created_at, recordatorio, sede)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(email, name, created_at, recordatorio, sede); // <--- Agregado el campo `sede`
+
+  return res.status(200).json({ success: true });
+}
+
 
   if (method === 'DELETE') {
     const { email } = req.body;

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 export default function AltaUsuario() {
   const [dias, setDias] = useState<number[]>([]);
   const [pagoEsteMes, setPagoEsteMes] = useState(true);
+  const [sede, setSede] = useState('Temperley');
 
   useEffect(() => {
     setDias(Array.from({ length: 28 }, (_, i) => i + 1));
@@ -14,11 +15,11 @@ export default function AltaUsuario() {
     const name = (form.elements.namedItem('name') as HTMLInputElement).value;
     const email = (form.elements.namedItem('email') as HTMLInputElement).value;
     const recordatorio = parseInt((form.elements.namedItem('recordatorio') as HTMLSelectElement).value);
-
+    
     const response = await fetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, recordatorio })
+      body: JSON.stringify({ name, email, recordatorio, sede })
     });
 
     if (!response.ok) {
@@ -69,6 +70,21 @@ export default function AltaUsuario() {
         />
         <label htmlFor="pagoEsteMes" className='text-gray-800'>¿Ya pagó este mes?</label>
       </div>
+
+      <div>
+      <label className="block text-sm mb-1 text-gray-800">Sede:</label>
+      <select
+        name="sede"
+        value={sede}
+        onChange={(e) => setSede(e.target.value)}
+        required
+        className="w-full p-2 border text-gray-800 rounded"
+      >
+        <option value="Temperley">Temperley</option>
+        <option value="Calzada">Calzada</option>
+      </select>
+    </div>
+
 
       <button
         type="submit"
