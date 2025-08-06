@@ -26,13 +26,14 @@ export default function Home() {
         </div>
 
         {/* Logo flotante */}
-        <div className="fixed top-6 left-6 z-50 group">
+        <div className="hidden md:fixed md:top-6 md:left-6 md:z-50 md:group">
           <img
             src="/img/soma-logo-sin-fondo.png"
             alt="Logo"
             className="w-40 transition-transform duration-300 transform group-hover:scale-110 group-hover:rotate-6 drop-shadow-lg"
           />
         </div>
+
 
         <div className="relative z-10 max-w-4xl mx-auto bg-[#fdfcf9] shadow-2xl rounded-2xl p-6 backdrop-blur-sm bg-opacity-90">
           {/* Tabs */}
