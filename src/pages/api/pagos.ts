@@ -1,31 +1,62 @@
+// pages/api/pagos.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import db from '@/lib/db';
+import pool from '@/lib/db';
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method === 'GET') {
-    type Pago = {
-        email: string;
-        fecha: string;
-    };
+type PagosMap = Record<string, string[]>;
 
-    const pagos = db.prepare('SELECT * FROM pagos').all() as Pago[];
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    if (req.method === 'GET') {
+      const { rows } = await pool.query<{ email: string; fecha: string }>(
+        'SELECT email, fecha FROM pagos ORDER BY email, fecha'
+      );
 
+      const pagosMap: PagosMap = {};
+      for (const { email, fecha } of rows) {
+        if (!pagosMap[email]) pagosMap[email] = [];
+        pagosMap[email].push(fecha);
+      }
 
-    // Agrupar pagos por email
-    const pagosMap: Record<string, string[]> = {};
-    pagos.forEach(p => {
-      if (!pagosMap[p.email]) pagosMap[p.email] = [];
-      pagosMap[p.email].push(p.fecha);
-    });
+      return res.status(200).json(pagosMap);
+    }
 
-    res.status(200).json(pagosMap);
-  }
+    if (req.method === 'POST') {
+      const { email, fecha } = req.body as { email?: string; fecha?: string };
+      if (!email) return res.status(400).json({ error: 'Falta email' });
 
-  if (req.method === 'POST') {
-    const { email, fecha } = req.body;
-    const fechaUso = fecha || new Date().toISOString().slice(0, 7); // Da '2025-07'
+      // default: mes actual en formato YYYY-MM
+      const fechaUso =
+        fecha ??
+        new Date().toISOString().slice(0, 7); // "YYYY-MM"
 
-    db.prepare('INSERT INTO pagos (email, fecha) VALUES (?, ?)').run(email, fechaUso);
-    res.status(200).json({ success: true });
+      // Validación simple YYYY-MM
+      if (!/^\d{4}-\d{2}$/.test(fechaUso)) {
+        return res.status(400).json({ error: 'fecha debe ser "YYYY-MM"' });
+      }
+      const mm = Number(fechaUso.slice(5));
+      if (mm < 1 || mm > 12) {
+        return res.status(400).json({ error: 'Mes inválido en fecha' });
+      }
+
+      try {
+        await pool.query(
+          'INSERT INTO pagos (email, fecha) VALUES ($1, $2)',
+          [email, fechaUso]
+        );
+      } catch (e: any) {
+        // 23503 = foreign_key_violation (si existe FK a usuarios(email))
+        if (e?.code === '23503') {
+          return res.status(400).json({ error: 'El usuario no existe' });
+        }
+        throw e;
+      }
+
+      return res.status(200).json({ success: true });
+    }
+
+    return res.status(405).json({ error: 'Método no permitido' });
+  } catch (err) {
+    console.error('API /pagos error:', err);
+    return res.status(500).json({ error: 'Error interno' });
   }
 }
