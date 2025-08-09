@@ -1,18 +1,11 @@
-// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
+// src/pages/api/hello.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { iniciarRecordatorioDiario } from '@/cron/recordatorios';
-type Data = {
-  name: string;
-};
 
-// Solo se ejecuta una vez porque Node cachea los módulos
-iniciarRecordatorioDiario();
+type Data = { name: string };
 
 export default function handler(
-  req: NextApiRequest,
+  _req: NextApiRequest,
   res: NextApiResponse<Data>,
 ) {
   res.status(200).json({ name: "John Doe" });
 }
-
-
