@@ -121,7 +121,7 @@ export default function Login({ onLogin }: LoginProps) {
             </button>
           </form>
 
-          {/* Credenciales de prueba */}
+          {/* Credenciales de prueba 
           <div className="mt-8 pt-6 border-t border-slate-200">
             <div className="bg-blue-50 rounded-xl p-4">
               <div className="flex items-start space-x-2">
@@ -137,7 +137,7 @@ export default function Login({ onLogin }: LoginProps) {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>
