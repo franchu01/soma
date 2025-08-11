@@ -359,24 +359,6 @@ export default function Estadisticas() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-2xl p-6 border border-emerald-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-          <div className="flex items-center justify-between mb-4">
-            <div className="bg-emerald-500 rounded-xl p-3 shadow-lg">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-emerald-600 font-medium">Mes actual</div>
-            </div>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-emerald-600 mb-1">Ingresos</p>
-            <p className="text-2xl font-bold text-emerald-800">{formatCurrency(ingresosMensuales)}</p>
-            <p className="text-xs text-emerald-600 mt-1">Recaudación mensual</p>
-          </div>
-        </div>
-
         <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-6 border border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
           <div className="flex items-center justify-between mb-4">
             <div className="bg-purple-500 rounded-xl p-3 shadow-lg">
@@ -509,13 +491,6 @@ export default function Estadisticas() {
               Métricas Clave
             </h3>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
-                  <span className="text-sm font-medium text-slate-700">Tasa de Retención</span>
-                </div>
-                <span className="text-lg font-bold text-blue-600">{tasaRetencion}%</span>
-              </div>
               
               <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                 <div className="flex items-center">
