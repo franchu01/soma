@@ -52,10 +52,8 @@ export default function Header({ onLogout, usuarios = [], pagos = {}, bajas = {}
           <div className="flex items-center justify-between h-16">
             {/* Logo y título */}
             <div className="flex items-center space-x-3">
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 w-10 h-10 rounded-lg flex items-center justify-center shadow-md">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                </svg>
+              <div className="flex items-center justify-center">
+                <img src="img/soma-logo-sin-fondo.png" alt="SOMA GYM" className="w-10 h-10" />
               </div>
               <div>
                 <h1 className="text-lg font-bold text-slate-800">
