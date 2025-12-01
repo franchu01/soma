@@ -295,6 +295,7 @@ export default function Estadisticas() {
             <option value="todas">🏢 Todas las sedes</option>
             <option value="Temperley">📍 Temperley</option>
             <option value="Calzada">📍 Calzada</option>
+            <option value="Pension">📍 Pension</option>
           </select>
         </div>
       </div>
@@ -400,6 +401,7 @@ export default function Estadisticas() {
                 <option value="todas">🏢 Todas las sedes</option>
                 <option value="Temperley">📍 Temperley</option>
                 <option value="Calzada">📍 Calzada</option>
+                <option value="Pension">📍 Pension</option>
               </select>
               <select
                 value={tipoGrafico}
