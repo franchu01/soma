@@ -44,7 +44,7 @@ export default function Estadisticas() {
   const [bajas, setBajas] = useState<Bajas>({});
   const [tipoGrafico, setTipoGrafico] = useState<'altas' | 'bajas' | 'pagos' | 'tendencias'>('altas');
   const [conteoMensual, setConteoMensual] = useState<number[]>([]);
-  const [sedeSeleccionada, setSedeSeleccionada] = useState<'todas' | 'Temperley' | 'Calzada'>('todas');
+  const [sedeSeleccionada, setSedeSeleccionada] = useState<'todas' | 'Temperley' | 'Calzada' | 'Pension'>('todas');
   const [isLoading, setIsLoading] = useState(true);
 
   const mesActual = new Date().toISOString().slice(0, 7); // yyyy-mm

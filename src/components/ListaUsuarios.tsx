@@ -22,7 +22,7 @@ export default function ListaUsuarios() {
   const [estado, setEstado] = useState<'activos' | 'todos'>('activos');
   const [busqueda, setBusqueda] = useState('');
   const [bajas, setBajas] = useState<Record<string, string[]>>({});
-  const [sede, setSede] = useState<'todos' | 'Temperley' | 'Calzada'>('todos');
+  const [sede, setSede] = useState<'todos' | 'Temperley' | 'Calzada' | 'Pension'>('todos');
   const [isLoading, setIsLoading] = useState(true);
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
 
@@ -163,11 +163,12 @@ export default function ListaUsuarios() {
             <select
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               value={sede}
-              onChange={(e) => setSede(e.target.value as 'todos' | 'Temperley' | 'Calzada')}
+              onChange={(e) => setSede(e.target.value as 'todos' | 'Temperley' | 'Calzada' | 'Pension')}
             >
               <option value="todos">🏢 Todas las sedes</option>
               <option value="Temperley">📍 Temperley</option>
               <option value="Calzada">📍 Calzada</option>
+              <option value="Pension">📍 Pension</option>
             </select>
           </div>
 
