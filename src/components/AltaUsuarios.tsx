@@ -137,6 +137,7 @@ export default function AltaUsuario({ onUserAdded }: AltaUsuarioProps = {}) {
           >
             <option value="Temperley">📍 Temperley</option>
             <option value="Calzada">📍 Calzada</option>
+            <option value="Pension">📍 Pension</option>
           </select>
         </div>
 
