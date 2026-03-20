@@ -10,6 +10,13 @@ type Usuario = {
 
 type Pagos = Record<string, string[]>;
 type Bajas = Record<string, string[]>;
+type EstadoPago = 'pagado' | 'pendiente' | 'deuda';
+
+function getEstadoPago(pagosMes: string[], mes: string, recordatorio: number): EstadoPago {
+  if (pagosMes?.some(p => p.startsWith(mes))) return 'pagado';
+  const diaHoy = new Date().getDate();
+  return diaHoy >= recordatorio ? 'deuda' : 'pendiente';
+}
 
 interface ModificarUsuariosProps {
   onUserUpdated?: () => void;
@@ -195,25 +202,27 @@ export default function ModificarUsuarios({ onUserUpdated }: ModificarUsuariosPr
       {/* Grid de usuarios */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {usuariosFiltrados.map((usuario) => {
-          const pagoMes = pagos[usuario.email]?.some((p: string) => p.startsWith(mesActual));
+          const ep = getEstadoPago(pagos[usuario.email] ?? [], mesActual, parseInt(usuario.recordatorio));
           const esBaja = bajas[usuario.email]?.some((p: string) => p.startsWith(mesActual));
-          
+
           return (
             <div
               key={usuario.email}
               className={`bg-white rounded-2xl shadow-lg border p-6 transition-all duration-300 hover:shadow-xl hover:scale-105 ${
-                esBaja 
-                  ? 'border-gray-300 bg-gray-50' 
-                  : pagoMes 
-                    ? 'border-green-200' 
-                    : 'border-red-200'
+                esBaja
+                  ? 'border-gray-300 bg-gray-50'
+                  : ep === 'pagado'
+                    ? 'border-green-200'
+                    : ep === 'pendiente'
+                      ? 'border-amber-200'
+                      : 'border-red-200'
               }`}
             >
               {/* Header del card */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-3">
                   <div className={`w-4 h-4 rounded-full ${
-                    esBaja ? 'bg-gray-400' : pagoMes ? 'bg-green-400' : 'bg-red-400'
+                    esBaja ? 'bg-gray-400' : ep === 'pagado' ? 'bg-green-400' : ep === 'pendiente' ? 'bg-amber-400' : 'bg-red-400'
                   }`}></div>
                   <div>
                     <h3 className="font-semibold text-slate-800 text-lg">{usuario.name}</h3>
@@ -221,13 +230,15 @@ export default function ModificarUsuarios({ onUserUpdated }: ModificarUsuariosPr
                   </div>
                 </div>
                 <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  esBaja 
-                    ? 'bg-gray-100 text-gray-600' 
-                    : pagoMes 
-                      ? 'bg-green-100 text-green-700' 
-                      : 'bg-red-100 text-red-700'
+                  esBaja
+                    ? 'bg-gray-100 text-gray-600'
+                    : ep === 'pagado'
+                      ? 'bg-green-100 text-green-700'
+                      : ep === 'pendiente'
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-red-100 text-red-700'
                 }`}>
-                  {esBaja ? '🚫 Baja' : pagoMes ? '✅ Al día' : '⚠️ Deuda'}
+                  {esBaja ? '🚫 Baja' : ep === 'pagado' ? '✅ Al día' : ep === 'pendiente' ? '🕐 Pendiente' : '⚠️ En deuda'}
                 </div>
               </div>
 
@@ -261,7 +272,7 @@ export default function ModificarUsuarios({ onUserUpdated }: ModificarUsuariosPr
                   <span>Editar Usuario</span>
                 </button>
 
-                {!pagoMes && !esBaja && (
+                {ep !== 'pagado' && !esBaja && (
                   <button
                     onClick={() => handleConfirmarPago(usuario.email)}
                     disabled={isPaymentLoading}
