@@ -6,12 +6,13 @@ import AltaUsuario from '@/components/AltaUsuarios';
 import ListaUsuarios from '@/components/ListaUsuarios';
 import Estadisticas from '@/components/Estadisticas';
 import ModificarUsuarios from '@/components/ModificarUsuarios';
+import MailsEnviados from '@/components/MailsEnviados';
 import Login from '@/components/Login';
 import Header from '@/components/Header';
 import NotificationPanel from '@/components/NotificationPanel';
 
 export default function Home() {
-  const [vista, setVista] = useState<'alta' | 'lista' | 'estadisticas' | 'modificar'>('alta');
+  const [vista, setVista] = useState<'alta' | 'lista' | 'estadisticas' | 'modificar' | 'mails'>('alta');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [usuarios, setUsuarios] = useState([]);
   const [pagos, setPagos] = useState({});
@@ -144,6 +145,7 @@ export default function Home() {
                     { id: 'lista',       label: 'Lista',      labelLg: 'Lista de Usuarios',  icon: 'M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
                     { id: 'estadisticas',label: 'Stats',      labelLg: 'Estadísticas',       icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
                     { id: 'modificar',   label: 'Editar',     labelLg: 'Modificar Usuarios', icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
+                    { id: 'mails',       label: 'Mails',      labelLg: 'Mails Enviados',     icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
                   ] as const).map(tab => (
                     <button
                       key={tab.id}
@@ -171,6 +173,7 @@ export default function Home() {
                 {vista === 'lista' && <ListaUsuarios />}
                 {vista === 'estadisticas' && <Estadisticas />}
                 {vista === 'modificar' && <ModificarUsuarios onUserUpdated={cargarDatos} />}
+                {vista === 'mails' && <MailsEnviados />}
               </div>
             </div>
           </div>
