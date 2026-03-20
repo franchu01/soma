@@ -1,15 +1,14 @@
-import type { NextConfig } from "next";
+// @ts-check
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  disable: process.env.NODE_ENV === 'development',
+  register: true,
+  skipWaiting: true,
+});
 
-const nextConfig: NextConfig = {
-  /* config options here */
+module.exports = withPWA({
   reactStrictMode: true,
-};
-
-// next.config.js
-module.exports = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-};
-
-export default nextConfig;
+});

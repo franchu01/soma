@@ -38,10 +38,12 @@ export default function AltaUsuario({ onUserAdded }: AltaUsuarioProps = {}) {
 
       // Si se marcó como "pago este mes", registramos el pago ahora
       if (pagoEsteMes) {
+        const d = new Date();
+        const fechaHoy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         await fetch('/api/pagos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
+          body: JSON.stringify({ email, fecha: fechaHoy })
         });
       }
 

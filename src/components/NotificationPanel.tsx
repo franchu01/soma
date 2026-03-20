@@ -9,7 +9,8 @@ export default function NotificationPanel({ usuarios, pagos }: NotificationProps
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
 
-  const mesActual = new Date().toISOString().slice(0, 7);
+  const now = new Date();
+  const mesActual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   useEffect(() => {
     const hoy = new Date();
@@ -17,11 +18,11 @@ export default function NotificationPanel({ usuarios, pagos }: NotificationProps
 
     // Usuarios con deuda
     usuarios.forEach(usuario => {
-      const hasPagado = pagos[usuario.email]?.includes(mesActual);
+      const hasPagado = pagos[usuario.email]?.some((p: string) => p.startsWith(mesActual));
       if (!hasPagado) {
         const recordatorio = parseInt(usuario.recordatorio || '1');
         const fechaRecordatorio = new Date(`${mesActual}-${String(recordatorio).padStart(2, '0')}`);
-        const diasDeuda = hoy > fechaRecordatorio 
+        const diasDeuda = hoy > fechaRecordatorio
           ? Math.floor((hoy.getTime() - fechaRecordatorio.getTime()) / (1000 * 60 * 60 * 24))
           : 0;
 
@@ -39,8 +40,8 @@ export default function NotificationPanel({ usuarios, pagos }: NotificationProps
 
     // Recordatorios próximos (próximos 3 días)
     usuarios.forEach(usuario => {
-      const hasPagado = pagos[usuario.email]?.includes(mesActual);
-      if (!hasPagado) {
+      const hasPagado2 = pagos[usuario.email]?.some((p: string) => p.startsWith(mesActual));
+      if (!hasPagado2) {
         const recordatorio = parseInt(usuario.recordatorio || '1');
         const fechaRecordatorio = new Date(`${mesActual}-${String(recordatorio).padStart(2, '0')}`);
         const diasHasta = Math.floor((fechaRecordatorio.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
@@ -99,7 +100,7 @@ export default function NotificationPanel({ usuarios, pagos }: NotificationProps
 
       {/* Panel de notificaciones */}
       {showNotifications && (
-        <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 animate-fade-in">
+        <div className="absolute right-0 top-12 w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 animate-fade-in">
           <div className="p-4 border-b border-slate-200">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-800">Notificaciones</h3>

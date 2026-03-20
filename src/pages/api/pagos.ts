@@ -24,16 +24,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { email, fecha } = req.body as { email?: string; fecha?: string };
       if (!email) return res.status(400).json({ error: 'Falta email' });
 
-      // default: mes actual en formato YYYY-MM
-      const fechaUso =
-        fecha ??
-        new Date().toISOString().slice(0, 7); // "YYYY-MM"
+      // Acepta YYYY-MM (mes sin día) o YYYY-MM-DD (fecha completa)
+      const fechaUso = fecha ?? (() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      })();
 
-      // Validación simple YYYY-MM
-      if (!/^\d{4}-\d{2}$/.test(fechaUso)) {
-        return res.status(400).json({ error: 'fecha debe ser "YYYY-MM"' });
+      if (!/^\d{4}-\d{2}(-\d{2})?$/.test(fechaUso)) {
+        return res.status(400).json({ error: 'fecha debe ser "YYYY-MM" o "YYYY-MM-DD"' });
       }
-      const mm = Number(fechaUso.slice(5));
+      const mm = Number(fechaUso.slice(5, 7));
       if (mm < 1 || mm > 12) {
         return res.status(400).json({ error: 'Mes inválido en fecha' });
       }
@@ -44,7 +44,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           [email, fechaUso]
         );
       } catch (e: any) {
-        // 23503 = foreign_key_violation (si existe FK a usuarios(email))
         if (e?.code === '23503') {
           return res.status(400).json({ error: 'El usuario no existe' });
         }

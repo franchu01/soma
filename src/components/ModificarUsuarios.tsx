@@ -34,7 +34,9 @@ export default function ModificarUsuarios({ onUserUpdated }: ModificarUsuariosPr
     sede: 'Temperley'
   });
 
-  const mesActual = new Date().toISOString().slice(0, 7);
+  const d = new Date();
+  const mesActual = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const fechaActual = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
   useEffect(() => {
     cargarDatos();
@@ -119,7 +121,7 @@ export default function ModificarUsuarios({ onUserUpdated }: ModificarUsuariosPr
       const response = await fetch('/api/pagos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email, fecha: fechaActual })
       });
 
       if (!response.ok) {
@@ -193,8 +195,8 @@ export default function ModificarUsuarios({ onUserUpdated }: ModificarUsuariosPr
       {/* Grid de usuarios */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {usuariosFiltrados.map((usuario) => {
-          const pagoMes = pagos[usuario.email]?.includes(mesActual);
-          const esBaja = bajas[usuario.email]?.includes(mesActual);
+          const pagoMes = pagos[usuario.email]?.some((p: string) => p.startsWith(mesActual));
+          const esBaja = bajas[usuario.email]?.some((p: string) => p.startsWith(mesActual));
           
           return (
             <div

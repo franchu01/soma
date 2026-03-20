@@ -122,14 +122,14 @@ export default function Home() {
         </div>
 
         {/* Container principal con padding responsivo */}
-        <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+        <div className="relative z-10 container mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8 lg:py-12">
           <div className="max-w-6xl mx-auto">
             {/* Header con título */}
-            <div className="text-center mb-8 lg:mb-12 animate-fade-in">
-              <h1 className="text-4xl lg:text-6xl font-bold text-white mb-4 tracking-tight animate-slide-in">
+            <div className="text-center mb-4 sm:mb-8 lg:mb-12 animate-fade-in">
+              <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold text-white mb-2 sm:mb-4 tracking-tight animate-slide-in">
                 SOMA <span className="text-blue-400 animate-pulse-slow">GYM</span>
               </h1>
-              <p className="text-lg lg:text-xl text-slate-300 max-w-2xl mx-auto animate-fade-in" style={{animationDelay: '0.2s'}}>
+              <p className="text-base sm:text-lg lg:text-xl text-slate-300 max-w-2xl mx-auto animate-fade-in hidden sm:block" style={{animationDelay: '0.2s'}}>
                 Sistema de gestión profesional para tu gimnasio
               </p>
             </div>
@@ -138,72 +138,34 @@ export default function Home() {
             <div className="bg-white/95 backdrop-blur-xl shadow-2xl rounded-3xl border border-white/20 overflow-hidden hover-lift">
               {/* Tabs mejorados */}
               <div className="bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200">
-                <div className="flex flex-wrap justify-center lg:justify-start px-6 lg:px-8">
-                  <button
-                    className={`relative px-6 py-4 font-semibold text-sm lg:text-base transition-all duration-300 ${
-                      vista === 'alta' 
-                        ? 'text-blue-600 border-b-3 border-blue-600' 
-                        : 'text-slate-600 hover:text-blue-600 hover:bg-white/50'
-                    }`}
-                    onClick={() => setVista('alta')}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                <div className="flex justify-around sm:justify-start px-2 sm:px-6 lg:px-8 overflow-x-auto">
+                  {([
+                    { id: 'alta',        label: 'Alta',       labelLg: 'Alta de Usuario',    icon: 'M12 6v6m0 0v6m0-6h6m-6 0H6' },
+                    { id: 'lista',       label: 'Lista',      labelLg: 'Lista de Usuarios',  icon: 'M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+                    { id: 'estadisticas',label: 'Stats',      labelLg: 'Estadísticas',       icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+                    { id: 'modificar',   label: 'Editar',     labelLg: 'Modificar Usuarios', icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
+                  ] as const).map(tab => (
+                    <button
+                      key={tab.id}
+                      className={`flex-shrink-0 flex flex-col sm:flex-row items-center sm:space-x-2 px-3 sm:px-6 py-3 font-semibold text-xs sm:text-sm lg:text-base transition-all duration-300 ${
+                        vista === tab.id
+                          ? 'text-blue-600 border-b-2 border-blue-600'
+                          : 'text-slate-600 hover:text-blue-600 hover:bg-white/50'
+                      }`}
+                      onClick={() => setVista(tab.id as typeof vista)}
+                    >
+                      <svg className="w-5 h-5 mb-1 sm:mb-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
                       </svg>
-                      <span>Alta de Usuario</span>
-                    </div>
-                  </button>
-                  <button
-                    className={`relative px-6 py-4 font-semibold text-sm lg:text-base transition-all duration-300 ${
-                      vista === 'lista' 
-                        ? 'text-blue-600 border-b-3 border-blue-600' 
-                        : 'text-slate-600 hover:text-blue-600 hover:bg-white/50'
-                    }`}
-                    onClick={() => setVista('lista')}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
-                      <span>Lista de Usuarios</span>
-                    </div>
-                  </button>
-                  <button
-                    className={`relative px-6 py-4 font-semibold text-sm lg:text-base transition-all duration-300 ${
-                      vista === 'estadisticas' 
-                        ? 'text-blue-600 border-b-3 border-blue-600' 
-                        : 'text-slate-600 hover:text-blue-600 hover:bg-white/50'
-                    }`}
-                    onClick={() => setVista('estadisticas')}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                      <span>Estadísticas</span>
-                    </div>
-                  </button>
-                  <button
-                    className={`relative px-6 py-4 font-semibold text-sm lg:text-base transition-all duration-300 ${
-                      vista === 'modificar' 
-                        ? 'text-blue-600 border-b-3 border-blue-600' 
-                        : 'text-slate-600 hover:text-blue-600 hover:bg-white/50'
-                    }`}
-                    onClick={() => setVista('modificar')}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                      <span>Modificar Usuarios</span>
-                    </div>
-                  </button>
+                      <span className="sm:hidden">{tab.label}</span>
+                      <span className="hidden sm:inline">{tab.labelLg}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
               {/* Contenido con padding mejorado */}
-              <div className="p-6 lg:p-8">
+              <div className="p-3 sm:p-6 lg:p-8">
                 {/* Vistas dinámicas */}
                 {vista === 'alta' && <AltaUsuario onUserAdded={cargarDatos} />}
                 {vista === 'lista' && <ListaUsuarios />}

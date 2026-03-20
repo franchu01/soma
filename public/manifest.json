@@ -1,0 +1,24 @@
+{
+  "name": "SOMA Gym",
+  "short_name": "SOMA",
+  "description": "Sistema de gestión para SOMA Gym",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#1e293b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/img/soma-logo-sin-fondo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/img/soma-logo-sin-fondo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
