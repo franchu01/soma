@@ -2,6 +2,36 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 
+// Asegura que todas las FK sobre usuarios.email tengan ON UPDATE CASCADE.
+// Idempotente: solo altera las constraints que aún no tienen CASCADE.
+async function ensureCascadeConstraints() {
+  await pool.query(`
+    DO $$
+    DECLARE
+      r RECORD;
+    BEGIN
+      FOR r IN
+        SELECT conname, conrelid::regclass AS tabla
+        FROM pg_constraint
+        WHERE confrelid = 'usuarios'::regclass
+          AND contype = 'f'
+          AND confupdtype != 'c'   -- 'c' = CASCADE; si ya es CASCADE no hace nada
+      LOOP
+        EXECUTE format(
+          'ALTER TABLE %s DROP CONSTRAINT %I',
+          r.tabla, r.conname
+        );
+        EXECUTE format(
+          'ALTER TABLE %s ADD CONSTRAINT %I
+           FOREIGN KEY (email) REFERENCES usuarios(email)
+           ON UPDATE CASCADE ON DELETE CASCADE',
+          r.tabla, r.conname
+        );
+      END LOOP;
+    END $$;
+  `);
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req;
 
@@ -89,25 +119,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(409).json({ error: 'Este nombre ya está registrado' });
       }
 
-      // Actualizar usuario
+      // Garantizar CASCADE antes de cambiar el email
+      if (email !== emailOriginal) {
+        await ensureCascadeConstraints();
+      }
+
+      // Con ON UPDATE CASCADE la BD propaga el nuevo email a pagos, bajas y presentes
       await pool.query(
-        `UPDATE usuarios 
+        `UPDATE usuarios
          SET email = $1, name = $2, recordatorio = $3, sede = $4
          WHERE email = $5`,
         [email, name, recNum, sede, emailOriginal]
       );
-
-      // Si se cambió el email, actualizar también en las tablas de pagos y bajas
-      if (email !== emailOriginal) {
-        await pool.query(
-          `UPDATE pagos SET email = $1 WHERE email = $2`,
-          [email, emailOriginal]
-        );
-        await pool.query(
-          `UPDATE bajas SET email = $1 WHERE email = $2`,
-          [email, emailOriginal]
-        );
-      }
 
       return res.status(200).json({ success: true });
     }

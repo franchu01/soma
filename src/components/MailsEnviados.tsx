@@ -1,24 +1,10 @@
-import { useEffect, useState } from 'react';
-import type { MailEnviado } from '@/pages/api/mails';
+import { useEffect, useState, useCallback } from 'react';
+import type { MailEnviado, MailsResponse } from '@/pages/api/mails';
 
 const MESES_ES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
-
-function getMesActual(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function getMesesDisponibles(mails: MailEnviado[]): string[] {
-  const set = new Set<string>();
-  for (const m of mails) {
-    const mes = m.fecha_envio.slice(0, 7);
-    set.add(mes);
-  }
-  return Array.from(set).sort().reverse();
-}
 
 function formatearFecha(iso: string): string {
   const d = new Date(iso);
@@ -34,48 +20,79 @@ function formatearMesLabel(yyyyMM: string): string {
   return `${MESES_ES[parseInt(m) - 1]} ${y}`;
 }
 
+const PAGE_SIZE = 50;
+
 export default function MailsEnviados() {
-  const [mails, setMails] = useState<MailEnviado[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [data, setData] = useState<MailEnviado[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalEsteMes, setTotalEsteMes] = useState(0);
+  const [totalErrorEsteMes, setTotalErrorEsteMes] = useState(0);
+  const [mesesDisponibles, setMesesDisponibles] = useState<string[]>([]);
+
+  const [page, setPage] = useState(0);
   const [busqueda, setBusqueda] = useState('');
-  const [filtroMes, setFiltroMes] = useState<string>('todos');
-  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'enviado' | 'error'>('todos');
+  const [filtroMes, setFiltroMes] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('');
+
+  const [isLoading, setIsLoading] = useState(true);
   const [reenviando, setReenviando] = useState<string | null>(null);
 
-  const cargarMails = async () => {
+  const cargarMails = useCallback(async (p: number) => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/mails');
-      if (res.ok) setMails(await res.json());
+      const params = new URLSearchParams({ page: String(p), limit: String(PAGE_SIZE) });
+      if (filtroMes) params.set('mes', filtroMes);
+      if (filtroEstado) params.set('estado', filtroEstado);
+      if (busqueda.trim()) params.set('q', busqueda.trim());
+
+      const res = await fetch(`/api/mails?${params}`);
+      if (!res.ok) return;
+      const json: MailsResponse = await res.json();
+
+      setData(json.data);
+      setTotal(json.total);
+      setTotalEsteMes(json.totalEsteMes);
+      setTotalErrorEsteMes(json.totalErrorEsteMes);
+      setMesesDisponibles(json.meses);
     } catch (e) {
       console.error(e);
     } finally {
       setIsLoading(false);
     }
+  }, [filtroMes, filtroEstado, busqueda]);
+
+  // Cargar cuando cambian filtros (vuelve a página 0)
+  useEffect(() => {
+    setPage(0);
+    cargarMails(0);
+  }, [filtroMes, filtroEstado]);
+
+  // Cargar cuando cambia la página
+  useEffect(() => {
+    cargarMails(page);
+  }, [page]);
+
+  // Búsqueda con debounce
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setPage(0);
+      cargarMails(0);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [busqueda]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const desde = total === 0 ? 0 : page * PAGE_SIZE + 1;
+  const hasta = Math.min((page + 1) * PAGE_SIZE, total);
+
+  const limpiarFiltros = () => {
+    setBusqueda('');
+    setFiltroMes('');
+    setFiltroEstado('');
   };
 
-  useEffect(() => { cargarMails(); }, []);
+  const hayFiltros = busqueda || filtroMes || filtroEstado;
 
-  const mesesDisponibles = getMesesDisponibles(mails);
-  const mesActual = getMesActual();
-
-  const mailsFiltrados = mails.filter(m => {
-    const mes = m.fecha_envio.slice(0, 7);
-    if (filtroMes !== 'todos' && mes !== filtroMes) return false;
-    if (filtroEstado !== 'todos' && m.estado !== filtroEstado) return false;
-    if (busqueda) {
-      const q = busqueda.toLowerCase();
-      if (!m.nombre.toLowerCase().includes(q) && !m.email.toLowerCase().includes(q)) return false;
-    }
-    return true;
-  });
-
-  // Stats
-  const totalEsteMes = mails.filter(m => m.fecha_envio.startsWith(mesActual)).length;
-  const totalErrorEsteMes = mails.filter(m => m.fecha_envio.startsWith(mesActual) && m.estado === 'error').length;
-  const totalGeneral = mails.length;
-
-  // Reenviar mail manualmente llamando al cron (solo disponible como referencia)
   const reenviarMail = async (mail: MailEnviado) => {
     setReenviando(String(mail.id));
     try {
@@ -85,7 +102,7 @@ export default function MailsEnviados() {
         body: JSON.stringify({ email: mail.email, nombre: mail.nombre }),
       });
       if (res.ok) {
-        await cargarMails();
+        cargarMails(page);
       } else {
         alert('Error al reenviar el mail');
       }
@@ -108,7 +125,7 @@ export default function MailsEnviados() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
           <p className="text-xs font-medium text-blue-600 mb-1">Total histórico</p>
-          <p className="text-2xl font-bold text-blue-800">{totalGeneral}</p>
+          <p className="text-2xl font-bold text-blue-800">{total}</p>
         </div>
         <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-4 border border-indigo-200">
           <p className="text-xs font-medium text-indigo-600 mb-1">Este mes</p>
@@ -150,7 +167,7 @@ export default function MailsEnviados() {
               onChange={e => setFiltroMes(e.target.value)}
               className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="todos">Todos los meses</option>
+              <option value="">Todos los meses</option>
               {mesesDisponibles.map(m => (
                 <option key={m} value={m}>{formatearMesLabel(m)}</option>
               ))}
@@ -160,18 +177,18 @@ export default function MailsEnviados() {
             <label className="block text-xs font-medium text-slate-600 mb-1">Estado</label>
             <select
               value={filtroEstado}
-              onChange={e => setFiltroEstado(e.target.value as typeof filtroEstado)}
+              onChange={e => setFiltroEstado(e.target.value)}
               className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="todos">Todos</option>
+              <option value="">Todos</option>
               <option value="enviado">Enviados</option>
               <option value="error">Con error</option>
             </select>
           </div>
         </div>
-        {(busqueda || filtroMes !== 'todos' || filtroEstado !== 'todos') && (
+        {hayFiltros && (
           <button
-            onClick={() => { setBusqueda(''); setFiltroMes('todos'); setFiltroEstado('todos'); }}
+            onClick={limpiarFiltros}
             className="mt-3 text-xs text-blue-600 hover:underline"
           >
             Limpiar filtros
@@ -179,21 +196,47 @@ export default function MailsEnviados() {
         )}
       </div>
 
-      {/* Resultado del filtro */}
-      <div className="flex items-center justify-between">
+      {/* Barra de resultados + paginación superior */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-sm text-slate-500">
-          {mailsFiltrados.length} resultado{mailsFiltrados.length !== 1 ? 's' : ''}
-          {filtroMes !== 'todos' ? ` en ${formatearMesLabel(filtroMes)}` : ''}
+          {isLoading ? 'Cargando...' : total === 0 ? 'Sin resultados' : `${desde}–${hasta} de ${total}`}
         </p>
-        <button
-          onClick={cargarMails}
-          className="inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-blue-600 transition-colors"
-        >
-          <svg className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => cargarMails(page)}
+            className="inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-blue-600 transition-colors"
+          >
+            <svg className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Actualizar
+          </button>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0 || isLoading}
+                className="p-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <span className="text-sm text-slate-600 px-2">
+                {page + 1} / {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1 || isLoading}
+                className="p-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tabla / Cards */}
@@ -205,23 +248,21 @@ export default function MailsEnviados() {
           </svg>
           <p className="text-slate-500">Cargando historial...</p>
         </div>
-      ) : mailsFiltrados.length === 0 ? (
+      ) : data.length === 0 ? (
         <div className="text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
           <svg className="w-14 h-14 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
           <p className="text-slate-600 font-medium">No hay mails para mostrar</p>
           <p className="text-slate-400 text-sm mt-1">
-            {mails.length === 0
-              ? 'Los recordatorios enviados aparecerán aquí automáticamente'
-              : 'Cambia los filtros para ver otros resultados'}
+            {hayFiltros ? 'Cambiá los filtros para ver otros resultados' : 'Los recordatorios enviados aparecerán aquí automáticamente'}
           </p>
         </div>
       ) : (
         <>
           {/* Mobile: cards */}
           <div className="md:hidden space-y-3">
-            {mailsFiltrados.map(m => (
+            {data.map(m => (
               <div key={m.id} className={`bg-white rounded-xl border shadow-sm p-4 ${m.estado === 'error' ? 'border-l-4 border-l-red-400' : 'border-l-4 border-l-green-400'}`}>
                 <div className="flex items-start justify-between mb-2">
                   <div className="min-w-0 flex-1">
@@ -248,7 +289,7 @@ export default function MailsEnviados() {
                     {reenviando === String(m.id) ? (
                       <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                        <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                       </svg>
                     ) : (
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -275,7 +316,7 @@ export default function MailsEnviados() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {mailsFiltrados.map(m => (
+                {data.map(m => (
                   <tr key={m.id} className={`hover:bg-slate-50 transition-colors ${m.estado === 'error' ? 'bg-red-50/50' : ''}`}>
                     <td className="px-5 py-3">
                       <p className="text-sm font-medium text-slate-800">{m.nombre}</p>
@@ -289,9 +330,7 @@ export default function MailsEnviados() {
                     <td className="px-5 py-3">
                       <div>
                         <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium ${
-                          m.estado === 'enviado'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-red-100 text-red-700'
+                          m.estado === 'enviado' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                         }`}>
                           {m.estado === 'enviado' ? (
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -321,7 +360,7 @@ export default function MailsEnviados() {
                           {reenviando === String(m.id) ? (
                             <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                              <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                              <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                             </svg>
                           ) : (
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -337,6 +376,46 @@ export default function MailsEnviados() {
               </tbody>
             </table>
           </div>
+
+          {/* Paginación inferior */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-sm text-slate-500">{desde}–{hasta} de {total} resultados</p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(0)}
+                  disabled={page === 0 || isLoading}
+                  className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  «
+                </button>
+                <button
+                  onClick={() => setPage(p => Math.max(0, p - 1))}
+                  disabled={page === 0 || isLoading}
+                  className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Anterior
+                </button>
+                <span className="text-sm text-slate-700 font-medium px-3">
+                  Pág. {page + 1} de {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1 || isLoading}
+                  className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Siguiente
+                </button>
+                <button
+                  onClick={() => setPage(totalPages - 1)}
+                  disabled={page >= totalPages - 1 || isLoading}
+                  className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  »
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

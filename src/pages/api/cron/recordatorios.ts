@@ -106,7 +106,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
 
     const resultados = await Promise.all(
-      usuarios.map(u => enviarYLoguear(u.email, u.name, u.recordatorio))
+      usuarios.map(u => enviarYLoguear(u.email, u.name, dia))
     );
 
     const ok = resultados.filter(r => r === 'enviado').length;
