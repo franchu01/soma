@@ -250,8 +250,10 @@ export default function ListaUsuarios() {
     );
   };
 
-  // Pre-compute counts for the stats row (based on ALL active users, not filtered)
-  const usuariosActivos = usuarios.filter(u => !estaDeBaja(u.email));
+  // Pre-compute counts for the stats row (active users, respecting the sede filter)
+  const usuariosActivos = usuarios.filter(
+    u => !estaDeBaja(u.email) && (sede === 'todos' || u.sede === sede)
+  );
   const cntPagado    = usuariosActivos.filter(u => getEstadoPago(pagos[u.email] ?? [], mesActual, parseInt(u.recordatorio ?? '1')) === 'pagado').length;
   const cntPendiente = usuariosActivos.filter(u => getEstadoPago(pagos[u.email] ?? [], mesActual, parseInt(u.recordatorio ?? '1')) === 'pendiente').length;
   const cntDeuda     = usuariosActivos.filter(u => getEstadoPago(pagos[u.email] ?? [], mesActual, parseInt(u.recordatorio ?? '1')) === 'deuda').length;
