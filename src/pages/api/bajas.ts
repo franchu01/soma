@@ -19,7 +19,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!email) return res.status(400).json({ error: 'Email requerido' });
 
       try {
-        await pool.query('INSERT INTO bajas (email, fecha) VALUES ($1, $2)', [email, mesActual]);
+        // Evita duplicar la baja del mes si ya existe
+        await pool.query(
+          `INSERT INTO bajas (email, fecha)
+           SELECT $1, $2
+           WHERE NOT EXISTS (SELECT 1 FROM bajas WHERE email = $1 AND fecha = $2)`,
+          [email, mesActual]
+        );
       } catch (e: any) {
         if (e?.code === '23503') {
           return res.status(400).json({ error: 'El usuario no existe' });
@@ -33,7 +39,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { email } = req.body as { email?: string };
       if (!email) return res.status(400).json({ error: 'Email requerido' });
 
-      await pool.query('DELETE FROM bajas WHERE email = $1 AND fecha = $2', [email, mesActual]);
+      // Reactivar = borrar TODAS las bajas del usuario (la baja persiste entre meses
+      // hasta que se reactiva explícitamente)
+      await pool.query('DELETE FROM bajas WHERE email = $1', [email]);
       return res.status(200).json({ success: true });
     }
 

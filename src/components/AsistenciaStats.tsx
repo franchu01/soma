@@ -22,7 +22,7 @@ type Usuario = {
   recordatorio: number;
 };
 
-type ConteoData = { fecha: string; cantidad: string };
+type ConteoData = { fecha: string; sede: string; cantidad: string };
 
 function toLocalDateString(date: Date) {
   return date.toLocaleDateString('sv-SE');
@@ -103,10 +103,8 @@ export default function AsistenciaStats() {
     else setHistorialUsuario([]);
   }, [usuarioSeleccionado, cargarHistorial]);
 
-  // Filtrar datos por sede: necesito cruzar con presentes por día
-  // Para el filtro por sede, hacemos fetch por cada fecha (costoso),
-  // así que el conteo general no filtra por sede desde la DB sino que
-  // mostramos "todas" con una nota. El filtro por sede se muestra en la tabla individual.
+  // El endpoint devuelve filas { fecha, sede, cantidad }. Filtramos por rango y
+  // por sede, y agregamos sumando las cantidades de cada día.
   const hoy = toLocalDateString(new Date());
   const fechaInicio = (() => {
     const d = new Date();
@@ -114,7 +112,9 @@ export default function AsistenciaStats() {
     return toLocalDateString(d);
   })();
 
-  const datosFiltrados = conteoDiario.filter(d => d.fecha >= fechaInicio && d.fecha <= hoy);
+  const datosFiltrados = conteoDiario.filter(
+    d => d.fecha >= fechaInicio && d.fecha <= hoy && (sedeFilter === 'todas' || d.sede === sedeFilter)
+  );
 
   // Generar labels con todos los días del rango
   const allDates: string[] = [];
@@ -124,7 +124,15 @@ export default function AsistenciaStats() {
     allDates.push(toLocalDateString(d));
   }
 
-  const cantidadPorFecha = Object.fromEntries(datosFiltrados.map(d => [d.fecha, parseInt(d.cantidad)]));
+  const cantidadPorFecha: Record<string, number> = {};
+  for (const d of datosFiltrados) {
+    cantidadPorFecha[d.fecha] = (cantidadPorFecha[d.fecha] ?? 0) + parseInt(d.cantidad);
+  }
+
+  // Totales agregados por fecha (para la tabla de top días)
+  const totalesPorFecha = Object.entries(cantidadPorFecha)
+    .map(([fecha, cantidad]) => ({ fecha, cantidad }))
+    .sort((a, b) => b.cantidad - a.cantidad);
 
   const chartData = {
     labels: allDates.map(f => {
@@ -225,7 +233,7 @@ export default function AsistenciaStats() {
       {tab === 'general' && (
         <div className="space-y-6">
           {/* Controles */}
-          <div className="flex flex-wrap gap-3 justify-center">
+          <div className="flex flex-wrap gap-3 justify-center items-center">
             <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
               {([30, 60, 90] as const).map(r => (
                 <button
@@ -239,6 +247,16 @@ export default function AsistenciaStats() {
                 </button>
               ))}
             </div>
+            <select
+              value={sedeFilter}
+              onChange={e => setSedeFilter(e.target.value)}
+              className="px-4 py-2.5 border border-slate-300 rounded-xl text-slate-700 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+            >
+              <option value="todas">Todas las sedes</option>
+              <option value="Temperley">Temperley</option>
+              <option value="Calzada">Calzada</option>
+              <option value="Pension">Pension</option>
+            </select>
           </div>
 
           {/* Métricas */}
@@ -285,14 +303,13 @@ export default function AsistenciaStats() {
               <h3 className="font-bold text-slate-800">Top días de mayor asistencia</h3>
             </div>
             <div className="divide-y divide-slate-100">
-              {[...datosFiltrados]
-                .sort((a, b) => parseInt(b.cantidad) - parseInt(a.cantidad))
+              {totalesPorFecha
                 .slice(0, 7)
                 .map((d, i) => {
                   const [y, m, day] = d.fecha.split('-').map(Number);
                   const date = new Date(y, m - 1, day);
                   const label = date.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-                  const pct = maximo > 0 ? Math.round((parseInt(d.cantidad) / maximo) * 100) : 0;
+                  const pct = maximo > 0 ? Math.round((d.cantidad / maximo) * 100) : 0;
                   return (
                     <div key={d.fecha} className="flex items-center gap-4 px-5 py-3">
                       <span className="text-sm font-bold text-slate-400 w-5">#{i + 1}</span>
@@ -308,7 +325,7 @@ export default function AsistenciaStats() {
                     </div>
                   );
                 })}
-              {datosFiltrados.length === 0 && (
+              {totalesPorFecha.length === 0 && (
                 <p className="text-center text-slate-400 py-8 text-sm">Sin datos registrados en este período</p>
               )}
             </div>

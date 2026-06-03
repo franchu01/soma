@@ -11,6 +11,7 @@ type ResultadoEnvio = EnviarResult & { asunto: string; total: number };
 
 export default function EnviarMail() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [bajas, setBajas] = useState<Record<string, string[]>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   // Selección de destinatarios
@@ -28,14 +29,23 @@ export default function EnviarMail() {
   const [vistaPrevia, setVistaPrevia] = useState(false);
 
   useEffect(() => {
-    fetch('/api/users')
-      .then(r => r.json())
-      .then(setUsuarios)
+    Promise.all([
+      fetch('/api/users').then(r => r.json()),
+      fetch('/api/bajas').then(r => r.json()),
+    ])
+      .then(([users, bajasData]) => {
+        setUsuarios(users);
+        setBajas(bajasData);
+      })
       .catch(console.error)
       .finally(() => setIsLoading(false));
   }, []);
 
+  // Los usuarios de baja no son destinatarios válidos (baja persistente)
+  const estaDeBaja = (email: string) => (bajas[email]?.length ?? 0) > 0;
+
   const usuariosFiltrados = usuarios.filter(u => {
+    if (estaDeBaja(u.email)) return false;
     if (filtroSede !== 'todos' && u.sede !== filtroSede) return false;
     if (busqueda) {
       const q = busqueda.toLowerCase();

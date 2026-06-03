@@ -41,13 +41,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json(result.rows);
       }
 
-      // Conteo diario para estadísticas (últimos 90 días)
+      // Conteo diario por sede para estadísticas (últimos 90 días)
       const result = await pool.query(
-        `SELECT fecha::text, COUNT(*) as cantidad
-         FROM presentes
-         WHERE fecha >= CURRENT_DATE - INTERVAL '90 days'
-         GROUP BY fecha
-         ORDER BY fecha ASC`
+        `SELECT p.fecha::text, u.sede, COUNT(*) as cantidad
+         FROM presentes p
+         JOIN usuarios u ON u.email = p.email
+         WHERE p.fecha >= CURRENT_DATE - INTERVAL '90 days'
+         GROUP BY p.fecha, u.sede
+         ORDER BY p.fecha ASC`
       );
       return res.status(200).json(result.rows);
     }

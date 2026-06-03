@@ -49,6 +49,10 @@ export default function ListaUsuarios() {
 
   const mesActual = getMesActual();
 
+  // Una baja persiste hasta que se reactiva: el usuario está de baja si tiene
+  // cualquier registro en bajas (no solo del mes actual).
+  const estaDeBaja = (email: string) => (bajas[email]?.length ?? 0) > 0;
+
   const cargarDatos = async () => {
     setIsLoading(true);
     try {
@@ -71,7 +75,7 @@ export default function ListaUsuarios() {
 
   const usuariosFiltrados = usuarios.filter((u) => {
     const estadoPago = getEstadoPago(pagos[u.email] ?? [], mesActual, parseInt(u.recordatorio ?? '1'));
-    const enBaja = bajas[u.email]?.some(b => b.startsWith(mesActual));
+    const enBaja = estaDeBaja(u.email);
 
     if (estado === 'activos' && enBaja) return false;
     if (filtro !== 'todos' && estadoPago !== filtro) return false;
@@ -247,7 +251,7 @@ export default function ListaUsuarios() {
   };
 
   // Pre-compute counts for the stats row (based on ALL active users, not filtered)
-  const usuariosActivos = usuarios.filter(u => !bajas[u.email]?.some(b => b.startsWith(mesActual)));
+  const usuariosActivos = usuarios.filter(u => !estaDeBaja(u.email));
   const cntPagado    = usuariosActivos.filter(u => getEstadoPago(pagos[u.email] ?? [], mesActual, parseInt(u.recordatorio ?? '1')) === 'pagado').length;
   const cntPendiente = usuariosActivos.filter(u => getEstadoPago(pagos[u.email] ?? [], mesActual, parseInt(u.recordatorio ?? '1')) === 'pendiente').length;
   const cntDeuda     = usuariosActivos.filter(u => getEstadoPago(pagos[u.email] ?? [], mesActual, parseInt(u.recordatorio ?? '1')) === 'deuda').length;
@@ -346,7 +350,7 @@ export default function ListaUsuarios() {
             {usuariosFiltrados.map((u) => {
               const rec = parseInt(u.recordatorio ?? '1');
               const ep = getEstadoPago(pagos[u.email] ?? [], mesActual, rec);
-              const enBaja = bajas[u.email]?.some(b => b.startsWith(mesActual)) ?? false;
+              const enBaja = estaDeBaja(u.email);
 
               const borderColor = enBaja
                 ? 'border-slate-200'
@@ -415,7 +419,7 @@ export default function ListaUsuarios() {
                   {usuariosFiltrados.map((u) => {
                     const rec = parseInt(u.recordatorio ?? '1');
                     const ep = getEstadoPago(pagos[u.email] ?? [], mesActual, rec);
-                    const enBaja = bajas[u.email]?.some(b => b.startsWith(mesActual)) ?? false;
+                    const enBaja = estaDeBaja(u.email);
 
                     const fechaRec = new Date(`${mesActual}-${String(rec).padStart(2, '0')}`);
                     const diasAtraso = ep === 'deuda'

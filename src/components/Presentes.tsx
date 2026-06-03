@@ -25,6 +25,7 @@ function formatDisplayDate(dateStr: string) {
 export default function Presentes() {
   const [selectedDate, setSelectedDate] = useState(toLocalDateString(new Date()));
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [bajas, setBajas] = useState<Record<string, string[]>>({});
   const [presentes, setPresentes] = useState<Set<string>>(new Set());
   const [sedeFilter, setSedeFilter] = useState<string>('todas');
   const [search, setSearch] = useState('');
@@ -32,9 +33,14 @@ export default function Presentes() {
   const [saving, setSaving] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/users')
-      .then(r => r.json())
-      .then(setUsuarios)
+    Promise.all([
+      fetch('/api/users').then(r => r.json()),
+      fetch('/api/bajas').then(r => r.json()),
+    ])
+      .then(([users, bajasData]) => {
+        setUsuarios(users);
+        setBajas(bajasData);
+      })
       .catch(console.error);
   }, []);
 
@@ -85,19 +91,27 @@ export default function Presentes() {
 
   const esHoy = selectedDate === toLocalDateString(new Date());
 
+  // Una baja persiste hasta reactivar: se excluyen de la lista de presentes
+  const estaDeBaja = (email: string) => (bajas[email]?.length ?? 0) > 0;
+
   const usuariosFiltrados = usuarios
+    .filter(u => !estaDeBaja(u.email))
     .filter(u => sedeFilter === 'todas' || u.sede === sedeFilter)
     .filter(u => !search || u.name.toLowerCase().includes(search.toLowerCase()));
 
   const presentesFiltrados = usuariosFiltrados.filter(u => presentes.has(u.email));
   const ausentesFiltrados = usuariosFiltrados.filter(u => !presentes.has(u.email));
 
-  const totalPresentes = usuarios.filter(u =>
-    (sedeFilter === 'todas' || u.sede === sedeFilter) && presentes.has(u.email)
-  ).length;
+  // Totales sobre el roster activo de la sede (sin búsqueda)
+  const rosterSede = usuarios.filter(
+    u => !estaDeBaja(u.email) && (sedeFilter === 'todas' || u.sede === sedeFilter)
+  );
+  const totalPresentes = rosterSede.filter(u => presentes.has(u.email)).length;
+  const totalAusentes = rosterSede.length - totalPresentes;
+  const pctAsistencia = rosterSede.length > 0 ? Math.round((totalPresentes / rosterSede.length) * 100) : 0;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <div className="text-center">
         <h2 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">
           Lista de Presentes
@@ -106,8 +120,8 @@ export default function Presentes() {
       </div>
 
       {/* Navegador de fecha */}
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-        <div className="flex items-center gap-3 bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3">
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+        <div className="flex items-center gap-3 bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-2.5">
           <button
             onClick={() => cambiarDia(-1)}
             className="p-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-600"
@@ -117,9 +131,8 @@ export default function Presentes() {
             </svg>
           </button>
 
-          <div className="text-center">
-            <p className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-0.5">Fecha seleccionada</p>
-            <p className="text-base font-bold text-slate-800 capitalize">{formatDisplayDate(selectedDate)}</p>
+          <div className="text-center min-w-[180px]">
+            <p className="text-base font-bold text-slate-800 capitalize leading-tight">{formatDisplayDate(selectedDate)}</p>
           </div>
 
           <button
@@ -133,7 +146,7 @@ export default function Presentes() {
           </button>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <input
             type="date"
             value={selectedDate}
@@ -150,6 +163,24 @@ export default function Presentes() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Resumen compacto (en lugar de cards grandes) */}
+      <div className="flex items-center justify-center gap-2 flex-wrap text-sm">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200">
+          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span className="font-bold text-emerald-700">{totalPresentes}</span>
+          <span className="text-emerald-600">presentes</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-200">
+          <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+          <span className="font-bold text-slate-700">{totalAusentes}</span>
+          <span className="text-slate-500">ausentes</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-50 border border-violet-200">
+          <span className="font-bold text-violet-700">{pctAsistencia}%</span>
+          <span className="text-violet-600">asistencia</span>
+        </span>
       </div>
 
       {/* Filtros y búsqueda */}
@@ -176,34 +207,6 @@ export default function Presentes() {
           <option value="Calzada">Calzada</option>
           <option value="Pension">Pension</option>
         </select>
-      </div>
-
-      {/* Resumen */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-2xl p-4 border border-emerald-200 text-center">
-          <p className="text-3xl font-bold text-emerald-700">{totalPresentes}</p>
-          <p className="text-sm font-medium text-emerald-600 mt-1">Presentes hoy</p>
-        </div>
-        <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-4 border border-slate-200 text-center">
-          <p className="text-3xl font-bold text-slate-700">
-            {usuarios.filter(u => sedeFilter === 'todas' || u.sede === sedeFilter).length - totalPresentes}
-          </p>
-          <p className="text-sm font-medium text-slate-600 mt-1">Ausentes</p>
-        </div>
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-4 border border-blue-200 text-center">
-          <p className="text-3xl font-bold text-blue-700">
-            {usuarios.filter(u => sedeFilter === 'todas' || u.sede === sedeFilter).length}
-          </p>
-          <p className="text-sm font-medium text-blue-600 mt-1">Total miembros</p>
-        </div>
-        <div className="bg-gradient-to-br from-violet-50 to-violet-100 rounded-2xl p-4 border border-violet-200 text-center">
-          <p className="text-3xl font-bold text-violet-700">
-            {usuarios.filter(u => sedeFilter === 'todas' || u.sede === sedeFilter).length > 0
-              ? Math.round((totalPresentes / usuarios.filter(u => sedeFilter === 'todas' || u.sede === sedeFilter).length) * 100)
-              : 0}%
-          </p>
-          <p className="text-sm font-medium text-violet-600 mt-1">Asistencia</p>
-        </div>
       </div>
 
       {loading ? (

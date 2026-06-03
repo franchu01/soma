@@ -96,13 +96,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
        WHERE u.recordatorio = $1
          AND NOT EXISTS (
            SELECT 1 FROM bajas b
-           WHERE b.email = u.email AND b.fecha = $2
+           WHERE b.email = u.email
          )
          AND NOT EXISTS (
            SELECT 1 FROM pagos p
-           WHERE p.email = u.email AND p.fecha LIKE $3
+           WHERE p.email = u.email AND p.fecha LIKE $2
          )`,
-      [dia, mes, `${mes}%`]
+      [dia, `${mes}%`]
     );
 
     const resultados = await Promise.all(
