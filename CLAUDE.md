@@ -24,15 +24,21 @@ No test framework is configured.
 **Database** (`src/lib/db.ts`): Single PostgreSQL pool shared across all API routes.
 
 ```
-usuarios (email PK, name UNIQUE, created_at, recordatorio INT 1-31, sede)
-pagos    (email FK, fecha YYYY-MM)
-bajas    (email FK, fecha YYYY-MM)
+usuarios  (email PK, name UNIQUE, created_at, recordatorio INT 1-31, sede,
+           qr_token UUID UNIQUE DEFAULT gen_random_uuid())
+pagos     (email FK, fecha YYYY-MM)
+bajas     (email FK, fecha YYYY-MM)
+presentes (id, email FK, fecha DATE, UNIQUE(email, fecha))
 ```
 
 **API Routes** (`src/pages/api/`):
 - `users.ts` — full CRUD; PUT cascades email changes to `pagos` and `bajas`
 - `pagos.ts` — GET returns `Map<email, fecha[]>`; POST records a monthly payment
 - `bajas.ts` — GET/POST/DELETE for cancellations
+- `presentes.ts` — GET/POST/DELETE for daily attendance
+- `qr.ts` — GET serves a member's QR code as PNG (`?download=1` forces download); QR content is `SOMA:<qr_token>` (see `src/lib/qr.ts`)
+- `scan.ts` — POST resolves a scanned QR, records today's attendance, returns payment status + unpaid months
+- `mails/qr.ts` — POST sends/resends the member's QR by email; gated by `ENVIAR_QR_POR_MAIL` env flag (returns `{ skipped: true }` when off)
 - `cron/recordatorios.ts` — invoked daily at 12:00 UTC by Vercel; sends HTML reminder emails to users whose `recordatorio` day matches today (Buenos Aires timezone)
 
 **Frontend** (`src/pages/index.tsx`): Single-page app with tab navigation (Alta / Lista / Estadísticas / Modificar). Auth is handled by `Login.tsx` with session stored in localStorage.
@@ -47,9 +53,10 @@ bajas    (email FK, fecha YYYY-MM)
 ## Environment Variables
 
 ```
-DATABASE_URL   # Neon pooled PostgreSQL connection string
-EMAIL_FROM     # Gmail sender address
-EMAIL_PASS     # Gmail app-specific password
+DATABASE_URL        # Neon pooled PostgreSQL connection string
+EMAIL_FROM          # Gmail sender address
+EMAIL_PASS          # Gmail app-specific password
+ENVIAR_QR_POR_MAIL  # "true" to enable sending QR codes by email (off by default)
 ```
 
 ## Deployment

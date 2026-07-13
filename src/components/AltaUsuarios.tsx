@@ -47,6 +47,14 @@ export default function AltaUsuario({ onUserAdded }: AltaUsuarioProps = {}) {
         });
       }
 
+      // Enviar el QR de acceso por mail (el backend lo saltea si el flag
+      // ENVIAR_QR_POR_MAIL está apagado); no bloquea el alta si falla
+      fetch('/api/mails/qr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      }).catch(err => console.error('Error enviando QR por mail:', err));
+
       form.reset();
       setPagoEsteMes(true);
       alert('✅ Usuario agregado correctamente');

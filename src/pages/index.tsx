@@ -13,6 +13,7 @@ import AsistenciaStats from '@/components/AsistenciaStats';
 import Login from '@/components/Login';
 import Header from '@/components/Header';
 import NotificationPanel from '@/components/NotificationPanel';
+import BottomBar from '@/components/BottomBar';
 
 export default function Home() {
   const [vista, setVista] = useState<'alta' | 'lista' | 'estadisticas' | 'modificar' | 'mails' | 'enviar' | 'presentes' | 'asistencia'>('alta');
@@ -125,8 +126,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Container principal con padding responsivo */}
-        <div className="relative z-10 container mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8 lg:py-12">
+        {/* Container principal con padding responsivo (pb extra por la barra inferior) */}
+        <div className="relative z-10 container mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8 lg:py-12 pb-24 sm:pb-28">
           <div className="max-w-6xl mx-auto">
             {/* Header con título */}
             <div className="text-center mb-4 sm:mb-8 lg:mb-12 animate-fade-in">
@@ -187,6 +188,9 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* Barra inferior con escáner de QR, visible en todas las vistas */}
+        <BottomBar onDatosCambiados={cargarDatos} />
       </main>
     </>
   );

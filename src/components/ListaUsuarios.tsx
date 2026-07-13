@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import HistorialPagos from './HistorialPagos';
+import QrModal from './QrModal';
 
 type Usuario = {
   name: string;
@@ -46,6 +47,7 @@ export default function ListaUsuarios() {
   const [isLoading, setIsLoading] = useState(true);
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const [historialUsuario, setHistorialUsuario] = useState<Usuario | null>(null);
+  const [qrUsuario, setQrUsuario] = useState<Usuario | null>(null);
 
   const mesActual = getMesActual();
 
@@ -201,6 +203,17 @@ export default function ListaUsuarios() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
           Historial
+        </button>
+
+        <button
+          onClick={() => setQrUsuario(u)}
+          className="inline-flex items-center px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-xs font-semibold"
+        >
+          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M3.5 7V5.5A2 2 0 015.5 3.5H7M17 3.5h1.5a2 2 0 012 2V7M20.5 17v1.5a2 2 0 01-2 2H17M7 20.5H5.5a2 2 0 01-2-2V17M7 7h3v3H7V7zm7 0h3v3h-3V7zm-7 7h3v3H7v-3zm7 0h1.5m1.5 0H17m0 1.5V17" />
+          </svg>
+          QR
         </button>
 
         {enBaja ? (
@@ -492,6 +505,13 @@ export default function ListaUsuarios() {
         bajas={bajas[historialUsuario.email] ?? []}
         onClose={() => setHistorialUsuario(null)}
         onPagoRegistrado={cargarDatos}
+      />
+    )}
+
+    {qrUsuario && (
+      <QrModal
+        usuario={qrUsuario}
+        onClose={() => setQrUsuario(null)}
       />
     )}
     </>

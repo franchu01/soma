@@ -66,6 +66,50 @@ function extraerDia(fecha: string): string | null {
 export default function HistorialPagos({ usuario, pagos, bajas, onClose, onPagoRegistrado }: Props) {
   const [loadingMes, setLoadingMes] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [mostrarQr, setMostrarQr] = useState(false);
+  const [enviandoMail, setEnviandoMail] = useState(false);
+
+  const qrUrl = `/api/qr?email=${encodeURIComponent(usuario.email)}`;
+
+  const compartirQr = async () => {
+    try {
+      const res = await fetch(qrUrl);
+      const blob = await res.blob();
+      const file = new File([blob], 'qr-soma.png', { type: 'image/png' });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: `QR de ${usuario.name}` });
+      } else {
+        // Sin Web Share API: abrir la imagen para guardarla/compartirla a mano
+        window.open(qrUrl, '_blank');
+      }
+    } catch {
+      // El usuario canceló el share; no es un error
+    }
+  };
+
+  const enviarQrPorMail = async () => {
+    setEnviandoMail(true);
+    try {
+      const res = await fetch('/api/mails/qr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: usuario.email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(`⚠️ ${data.error ?? 'Error al enviar el mail'}`);
+      } else if (data.skipped) {
+        alert('⚠️ El envío de QR por mail está deshabilitado (flag ENVIAR_QR_POR_MAIL). No se envió nada.');
+      } else {
+        alert('✅ QR enviado por mail');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('❌ Error al enviar el mail');
+    } finally {
+      setEnviandoMail(false);
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -112,6 +156,18 @@ export default function HistorialPagos({ usuario, pagos, bajas, onClose, onPagoR
             <p className="text-xs text-slate-500 truncate">{usuario.email} · {usuario.sede}</p>
           </div>
           <button
+            onClick={() => setMostrarQr(v => !v)}
+            className={`flex-shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors mr-1 ${
+              mostrarQr ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M3.5 7V5.5A2 2 0 015.5 3.5H7M17 3.5h1.5a2 2 0 012 2V7M20.5 17v1.5a2 2 0 01-2 2H17M7 20.5H5.5a2 2 0 01-2-2V17M7 7h3v3H7V7zm7 0h3v3h-3V7zm-7 7h3v3H7v-3zm7 0h1.5m1.5 0H17m0 1.5V17" />
+            </svg>
+            QR
+          </button>
+          <button
             onClick={onClose}
             className="flex-shrink-0 p-2 hover:bg-slate-100 rounded-lg transition-colors"
           >
@@ -120,6 +176,54 @@ export default function HistorialPagos({ usuario, pagos, bajas, onClose, onPagoR
             </svg>
           </button>
         </div>
+
+        {/* QR de acceso del cliente */}
+        {mostrarQr && (
+          <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center gap-4">
+            <img
+              src={qrUrl}
+              alt={`QR de ${usuario.name}`}
+              className="w-36 h-36 bg-white rounded-xl border border-slate-200 p-2"
+            />
+            <div className="flex flex-col gap-2 w-full sm:w-auto">
+              <a
+                href={`${qrUrl}&download=1`}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors text-xs font-semibold"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Descargar
+              </a>
+              <button
+                onClick={compartirQr}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-semibold"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                Compartir
+              </button>
+              <button
+                onClick={enviarQrPorMail}
+                disabled={enviandoMail}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-semibold disabled:opacity-50"
+              >
+                {enviandoMail ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                )}
+                Enviar por mail
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Resumen */}
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap gap-3 text-sm">
