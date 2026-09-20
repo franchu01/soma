@@ -1,14 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
-import nodemailer from 'nodemailer';
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_FROM,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+import { qrPngBuffer, ensureQrToken } from '@/lib/qr';
+import {
+  transporter, FROM, recordatorioMailHtml, qrAttachment,
+  ensureMailsTable, logMail,
+} from '@/lib/mailer';
 
 // Día y mes de hoy en Buenos Aires (no UTC)
 function hoyBuenosAires(): { dia: number; mes: string } {
@@ -27,40 +23,27 @@ function hoyBuenosAires(): { dia: number; mes: string } {
 
 const ASUNTO = '💪 Recordatorio de pago de gimnasio';
 
-async function enviarYLoguear(email: string, nombre: string, dia: number) {
+async function enviarYLoguear(email: string, nombre: string, dia: number, qrToken: string | null) {
   let estado: 'enviado' | 'error' = 'enviado';
   let errorDetalle: string | null = null;
 
   try {
+    // El QR va embebido; si por algún motivo el usuario no tiene token,
+    // el recordatorio igual sale (sin la imagen).
+    const png = qrToken ? await qrPngBuffer(qrToken) : null;
     await transporter.sendMail({
-      from: `"SOMA Gym" <${process.env.EMAIL_FROM}>`,
+      from: FROM,
       to: email,
       subject: ASUNTO,
-      html: `
-        <p>Hola ${nombre},</p>
-        <p>Hoy es día ${dia} del mes.</p>
-        <p>No olvides abonar tu mensualidad del gimnasio 💸.</p>
-        <p>¡Seguimos entrenando fuerte! 🏋️‍♂️</p>
-        <hr/>
-        <p><small>Mensaje automático. No responder.</small></p>
-      `,
+      html: recordatorioMailHtml(nombre, dia, png !== null),
+      attachments: png ? [qrAttachment(png)] : [],
     });
   } catch (err: any) {
     estado = 'error';
     errorDetalle = err?.message ?? 'Error desconocido';
   }
 
-  // Registrar en la base de datos (no lanzar si falla el log)
-  try {
-    await pool.query(
-      `INSERT INTO mails_enviados (email, nombre, asunto, estado, error_detalle)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [email, nombre, ASUNTO, estado, errorDetalle]
-    );
-  } catch (logErr) {
-    console.error('[CRON] Error al loguear mail:', logErr);
-  }
-
+  await logMail(email, nombre, ASUNTO, estado, errorDetalle);
   return estado;
 }
 
@@ -71,18 +54,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Asegurar que la tabla existe
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS mails_enviados (
-        id           SERIAL PRIMARY KEY,
-        email        VARCHAR NOT NULL,
-        nombre       VARCHAR NOT NULL,
-        asunto       VARCHAR NOT NULL,
-        fecha_envio  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        estado       VARCHAR(10) NOT NULL DEFAULT 'enviado',
-        error_detalle TEXT
-      )
-    `);
+    await ensureMailsTable();
+    await ensureQrToken();
 
     const { dia, mes } = hoyBuenosAires();
 
@@ -90,8 +63,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       name: string;
       email: string;
       recordatorio: number;
+      qr_token: string | null;
     }>(
-      `SELECT u.name, u.email, u.recordatorio
+      `SELECT u.name, u.email, u.recordatorio, u.qr_token
        FROM usuarios u
        WHERE u.recordatorio = $1
          AND NOT EXISTS (
@@ -106,7 +80,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
 
     const resultados = await Promise.all(
-      usuarios.map(u => enviarYLoguear(u.email, u.name, dia))
+      usuarios.map(u => enviarYLoguear(u.email, u.name, dia, u.qr_token))
     );
 
     const ok = resultados.filter(r => r === 'enviado').length;

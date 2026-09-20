@@ -8,32 +8,11 @@ const ENVIO_HABILITADO = process.env.ENVIAR_QR_POR_MAIL === 'true';
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
-import nodemailer from 'nodemailer';
 import { getQrTokenByEmail, qrPngBuffer } from '@/lib/qr';
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_FROM,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-const ASUNTO = '🎫 Tu código QR de acceso - SOMA Gym';
-
-async function ensureMailsTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS mails_enviados (
-      id           SERIAL PRIMARY KEY,
-      email        VARCHAR NOT NULL,
-      nombre       VARCHAR NOT NULL,
-      asunto       VARCHAR NOT NULL,
-      fecha_envio  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      estado       VARCHAR(10) NOT NULL DEFAULT 'enviado',
-      error_detalle TEXT
-    )
-  `);
-}
+import {
+  transporter, FROM, ASUNTO_QR as ASUNTO, qrMailHtml, qrAttachment,
+  ensureMailsTable, logMail,
+} from '@/lib/mailer';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -67,44 +46,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     try {
       await transporter.sendMail({
-        from: `"SOMA Gym" <${process.env.EMAIL_FROM}>`,
+        from: FROM,
         to: email,
         subject: ASUNTO,
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
-            <p>Hola ${nombre},</p>
-            <p>Este es tu código QR personal de acceso al gimnasio. Mostralo en recepción al llegar para registrar tu asistencia 🏋️‍♂️.</p>
-            <p style="text-align:center"><img src="cid:qr-soma" alt="Tu código QR" width="256" height="256"/></p>
-            <p>También lo encontrás adjunto en este mail para guardarlo en tu teléfono.</p>
-            <hr style="margin-top:32px"/>
-            <p><small style="color:#888">Mensaje enviado desde SOMA Gym. No responder.</small></p>
-          </div>
-        `,
-        attachments: [
-          {
-            filename: 'qr-soma.png',
-            content: png,
-            contentType: 'image/png',
-            cid: 'qr-soma',
-          },
-        ],
+        html: qrMailHtml(nombre),
+        attachments: [qrAttachment(png)],
       });
     } catch (err: any) {
       estado = 'error';
       errorDetalle = err?.message ?? 'Error desconocido';
     }
 
-    // Registrar el intento (no lanzar si falla el log)
-    try {
-      await ensureMailsTable();
-      await pool.query(
-        `INSERT INTO mails_enviados (email, nombre, asunto, estado, error_detalle)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [email, nombre, ASUNTO, estado, errorDetalle]
-      );
-    } catch (logErr) {
-      console.error('[mails/qr] Error al loguear:', logErr);
-    }
+    await ensureMailsTable();
+    await logMail(email, nombre, ASUNTO, estado, errorDetalle);
 
     if (estado === 'error') {
       return res.status(500).json({ error: errorDetalle });

@@ -1,6 +1,7 @@
 // src/pages/api/bajas.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
+import { enviarQrBienvenida } from '@/lib/mailer';
 
 // Mes actual en TZ local (evita problemas de UTC)
 function mesActualYYYYMM() {
@@ -41,7 +42,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Reactivar = borrar TODAS las bajas del usuario (la baja persiste entre meses
       // hasta que se reactiva explícitamente)
-      await pool.query('DELETE FROM bajas WHERE email = $1', [email]);
+      const { rowCount } = await pool.query('DELETE FROM bajas WHERE email = $1', [email]);
+
+      // Mail de bienvenida de vuelta con el QR, solo si realmente estaba de baja
+      // (evita mandarlo de nuevo si se hace clic dos veces en Reactivar).
+      if (rowCount && rowCount > 0) {
+        const { rows } = await pool.query<{ name: string }>(
+          'SELECT name FROM usuarios WHERE email = $1',
+          [email]
+        );
+        if (rows[0]) await enviarQrBienvenida(email, rows[0].name, true);
+      }
+
       return res.status(200).json({ success: true });
     }
 
