@@ -3,9 +3,10 @@ import { useState, useEffect } from 'react';
 interface NotificationProps {
   usuarios: any[];
   pagos: Record<string, string[]>;
+  bajas?: Record<string, string[]>;
 }
 
-export default function NotificationPanel({ usuarios, pagos }: NotificationProps) {
+export default function NotificationPanel({ usuarios, pagos, bajas = {} }: NotificationProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
 
@@ -16,8 +17,12 @@ export default function NotificationPanel({ usuarios, pagos }: NotificationProps
     const hoy = new Date();
     const notifs: any[] = [];
 
+    // Un usuario de baja no debe nada mientras dure la baja (persiste hasta
+    // que se reactiva), así que no le generamos alertas de pago.
+    const usuariosActivos = usuarios.filter(u => (bajas[u.email]?.length ?? 0) === 0);
+
     // Usuarios con deuda
-    usuarios.forEach(usuario => {
+    usuariosActivos.forEach(usuario => {
       const hasPagado = pagos[usuario.email]?.some((p: string) => p.startsWith(mesActual));
       if (!hasPagado) {
         const recordatorio = parseInt(usuario.recordatorio || '1');
@@ -39,7 +44,7 @@ export default function NotificationPanel({ usuarios, pagos }: NotificationProps
     });
 
     // Recordatorios próximos (próximos 3 días)
-    usuarios.forEach(usuario => {
+    usuariosActivos.forEach(usuario => {
       const hasPagado2 = pagos[usuario.email]?.some((p: string) => p.startsWith(mesActual));
       if (!hasPagado2) {
         const recordatorio = parseInt(usuario.recordatorio || '1');
@@ -59,7 +64,7 @@ export default function NotificationPanel({ usuarios, pagos }: NotificationProps
     });
 
     setNotifications(notifs.slice(0, 10)); // Máximo 10 notificaciones
-  }, [usuarios, pagos, mesActual]);
+  }, [usuarios, pagos, bajas, mesActual]);
 
   const getNotificationIcon = (type: string) => {
     switch (type) {

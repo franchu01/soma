@@ -96,10 +96,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ? 'pagado'
       : dia >= Number(usuario.recordatorio) ? 'deuda' : 'pendiente';
 
-    // Meses anteriores sin pago, excluyendo meses con baja registrada
-    // (mismo criterio que el historial de pagos)
+    // Meses anteriores sin pago, excluyendo los meses de baja: la baja solo
+    // guarda el mes en que se dio de baja (persiste hasta reactivarse), así
+    // que un mes cuenta como "de baja" si es igual o posterior a ese registro,
+    // no solo si coincide exactamente (mismo criterio que el historial de pagos).
+    const primerMesBaja = bajas.length > 0 ? bajas.reduce((min, b) => (b < min ? b : min), bajas[0]) : null;
     const mesesImpagos = mesesDesdeAlta(usuario.created_at, mes)
-      .filter(m => !pagos.some(p => p.startsWith(m)) && !bajas.some(b => b.startsWith(m)))
+      .filter(m => !pagos.some(p => p.startsWith(m)) && !(primerMesBaja !== null && m >= primerMesBaja))
       .reverse();
 
     const result: ScanResult = {

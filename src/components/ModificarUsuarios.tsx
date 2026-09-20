@@ -203,7 +203,9 @@ export default function ModificarUsuarios({ onUserUpdated }: ModificarUsuariosPr
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {usuariosFiltrados.map((usuario) => {
           const ep = getEstadoPago(pagos[usuario.email] ?? [], mesActual, parseInt(usuario.recordatorio));
-          const esBaja = bajas[usuario.email]?.some((p: string) => p.startsWith(mesActual));
+          // Cualquier registro de baja implica inactivo: persiste hasta que se
+          // reactiva (borra todos los registros), no solo el mes en que ocurrió.
+          const esBaja = (bajas[usuario.email]?.length ?? 0) > 0;
 
           return (
             <div

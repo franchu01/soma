@@ -112,7 +112,7 @@ export default function Home() {
 
         {/* Panel de notificaciones flotante */}
         <div className="fixed top-20 right-4 z-40">
-          <NotificationPanel usuarios={usuarios} pagos={pagos} />
+          <NotificationPanel usuarios={usuarios} pagos={pagos} bajas={bajas} />
         </div>
 
         {/* Logo flotante mejorado - movido más abajo por el header */}

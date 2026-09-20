@@ -54,6 +54,15 @@ function pagoDelMes(pagos: string[], mes: string): string | null {
   return pagos.find(p => p.startsWith(mes)) ?? null;
 }
 
+// `bajas` solo guarda el mes en que se dio de baja, no uno por cada mes
+// inactivo (la baja persiste hasta que se reactiva, ver bajas.ts). Por eso
+// un mes cuenta como "de baja" si es igual o posterior al primer registro,
+// no solo si coincide exactamente.
+function primerMesDeBaja(bajas: string[]): string | null {
+  if (bajas.length === 0) return null;
+  return bajas.reduce((min, b) => (b < min ? b : min), bajas[0]);
+}
+
 // Extrae el día si la fecha es YYYY-MM-DD
 function extraerDia(fecha: string): string | null {
   if (fecha.length === 10) {
@@ -136,7 +145,11 @@ export default function HistorialPagos({ usuario, pagos, bajas, onClose, onPagoR
     }
   };
 
+  const primeraBaja = primerMesDeBaja(bajas);
+  const esMesDeBaja = (mes: string) => primeraBaja !== null && mes >= primeraBaja;
+
   const pagados = meses.filter(m => pagoDelMes(pagos, m)).length;
+  const enBaja = meses.filter(m => !pagoDelMes(pagos, m) && esMesDeBaja(m)).length;
   const total = meses.length;
 
   const modal = (
@@ -229,7 +242,13 @@ export default function HistorialPagos({ usuario, pagos, bajas, onClose, onPagoR
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap gap-3 text-sm">
           <span className="text-green-700 font-semibold">{pagados} pagados</span>
           <span className="text-slate-300">|</span>
-          <span className="text-red-600 font-semibold">{total - pagados} faltantes</span>
+          <span className="text-red-600 font-semibold">{total - pagados - enBaja} faltantes</span>
+          {enBaja > 0 && (
+            <>
+              <span className="text-slate-300">|</span>
+              <span className="text-slate-500">{enBaja} de baja</span>
+            </>
+          )}
           <span className="text-slate-300">|</span>
           <span className="text-slate-600">{total} meses en total</span>
         </div>
@@ -238,7 +257,7 @@ export default function HistorialPagos({ usuario, pagos, bajas, onClose, onPagoR
         <div className="overflow-y-auto flex-1 p-4 space-y-2">
           {meses.map(mes => {
             const pagoEncontrado = pagoDelMes(pagos, mes);
-            const esBaja = bajas.some(b => b.startsWith(mes));
+            const esBaja = esMesDeBaja(mes);
 
             return (
               <div
