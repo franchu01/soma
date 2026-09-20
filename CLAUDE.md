@@ -24,30 +24,47 @@ No test framework is configured.
 **Database** (`src/lib/db.ts`): Single PostgreSQL pool shared across all API routes.
 
 ```
-usuarios  (email PK, name UNIQUE, created_at, recordatorio INT 1-31, sede,
-           qr_token UUID UNIQUE DEFAULT gen_random_uuid())
-pagos     (email FK, fecha YYYY-MM)
-bajas     (email FK, fecha YYYY-MM)
-presentes (id, email FK, fecha DATE, UNIQUE(email, fecha))
+usuarios       (email PK, name UNIQUE, created_at, recordatorio INT 1-31, sede,
+                qr_token UUID UNIQUE DEFAULT gen_random_uuid(), foto_url TEXT)
+pagos          (email FK, fecha YYYY-MM)
+bajas          (email FK, fecha YYYY-MM)
+presentes      (id, email FK, fecha DATE, UNIQUE(email, fecha))
+mails_enviados (id, email, nombre, asunto, fecha_envio, estado enviado|error,
+                error_detalle) — log of every mail attempt; also used to make
+                the reminder crons idempotent (see below)
 ```
 
+Payment status per member (`getEstadoPago` in `ListaUsuarios.tsx`, mirrored in `scan.ts`):
+`pagado` (paid this month) / `pendiente` (unpaid, `recordatorio` day hasn't hit yet) / `deuda` (unpaid, day has passed).
+
+**Profile photos** (`src/lib/foto.ts`, `src/lib/imagen.ts`, `src/components/FotoUsuario.tsx`): each member can have a profile photo, shown as a clickable avatar next to their name in `ListaUsuarios` (both the mobile cards and the desktop table) so staff can recognize faces at a glance. Clicking it opens the device camera/file picker (`<input capture="environment">`), the image is resized and re-encoded to WebP client-side (`comprimirImagen` in `lib/imagen.ts`, ~15-40KB output) before it's ever uploaded, and `POST /api/foto` (`{ email, dataUrl }`) stores it in **Vercel Blob** — not Postgres, to keep binaries and their I/O off the shared DB pool — saving only the resulting public URL in `usuarios.foto_url`. Uploading a new photo deletes the previous Blob object. Requires a Blob store connected to the Vercel project (`BLOB_READ_WRITE_TOKEN`, see below); without it `/api/foto` fails at runtime (upload only — the rest of the app is unaffected).
+
+**Mail sending** (`src/lib/mailer.ts`): Shared Nodemailer transporter, `FROM` address, HTML templates (`qrMailHtml`, `bienvenidaMailHtml`, `recordatorioMailHtml`, `deudaMailHtml`), and `logMail`/`ensureMailsTable` helpers, so every templated mail in the app logs to `mails_enviados` the same way. `enviarQrBienvenida()` is called from `users.ts` (new member) and `bajas.ts` (reactivation) to send the welcome/QR mail — gated by `ENVIAR_QR_POR_MAIL`, and never throws (a mail failure must not block the underlying operation). The ad-hoc mail composer (`mails/enviar.ts`) is separate and keeps its own transporter since it sends free-text, not a template.
+
 **API Routes** (`src/pages/api/`):
-- `users.ts` — full CRUD; PUT cascades email changes to `pagos` and `bajas`
+- `users.ts` — full CRUD; PUT cascades email changes to `pagos` and `bajas`; POST sends the welcome/QR mail
 - `pagos.ts` — GET returns `Map<email, fecha[]>`; POST records a monthly payment
-- `bajas.ts` — GET/POST/DELETE for cancellations
-- `presentes.ts` — GET/POST/DELETE for daily attendance
+- `bajas.ts` — GET/POST/DELETE for cancellations; DELETE (reactivation) resends the welcome/QR mail
+- `presentes.ts` — GET/POST/DELETE for daily attendance. GET supports `?email=` (one user's history), `?emails=a,b,c` (bulk history for several users, e.g. debtor attendance), `?fecha=` (who attended a given day), or no params (90-day daily counts by sede for stats)
+- `foto.ts` — POST uploads a member's profile photo to Vercel Blob and updates `foto_url`; DELETE removes it. Expects an already-compressed image as a `dataUrl` (see Profile photos above)
 - `qr.ts` — GET serves a member's QR code as PNG (`?download=1` forces download); QR content is `SOMA:<qr_token>` (see `src/lib/qr.ts`)
 - `scan.ts` — POST resolves a scanned QR, records today's attendance, returns payment status + unpaid months
-- `mails/qr.ts` — POST sends/resends the member's QR by email; gated by `ENVIAR_QR_POR_MAIL` env flag (returns `{ skipped: true }` when off)
-- `cron/recordatorios.ts` — invoked daily at 12:00 UTC by Vercel; sends HTML reminder emails to users whose `recordatorio` day matches today (Buenos Aires timezone)
+- `mails/qr.ts` — POST sends/resends one member's QR by email; gated by `ENVIAR_QR_POR_MAIL` (returns `{ skipped: true }` when off)
+- `mails/qr-masivo.ts` — POST one-off bulk send of the QR to every member who hasn't received it yet (per `mails_enviados`); requires `CRON_TOKEN`; supports `dryRun=1`, `incluirBajas=1`, `limit=N`
+- `mails/enviar.ts` / `mails/reenviar.ts` / `mails/index.ts` — free-text mail composer (`EnviarMail.tsx`) and sent-mail log (`MailsEnviados.tsx`)
+- `cron/recordatorios.ts` — invoked daily by Vercel; sends the monthly payment reminder to users whose `recordatorio` day matches today (Buenos Aires timezone)
+- `cron/recordatorio-deuda.ts` — invoked daily by Vercel; re-sends a debt reminder to every user currently `en deuda`, but skips anyone who already got one in the last 5 days (checked against `mails_enviados`) — this is what makes a daily cron behave like a 5-day reminder
 
-**Frontend** (`src/pages/index.tsx`): Single-page app with tab navigation (Alta / Lista / Estadísticas / Modificar). Auth is handled by `Login.tsx` with session stored in localStorage.
+Both cron routes and `mails/qr-masivo.ts` require a matching `x-cron-token` header or `?token=` query param when `CRON_TOKEN` is set.
+
+**Frontend** (`src/pages/index.tsx`): Single-page app with tab navigation (Alta / Lista / Estadísticas / Modificar / Mails / Enviar / Presentes / Asistencia). Auth is handled by `Login.tsx` with session stored in localStorage.
 
 **Key components:**
 - `AltaUsuarios` — new member registration, optionally records first payment
-- `ListaUsuarios` — member list with payment/cancellation history
+- `ListaUsuarios` — member list with payment/cancellation history; each row shows a clickable `FotoUsuario` avatar to view/update the member's photo; includes a "¿Van al gym igual?" button that opens `DeudoresAsistencia`, a modal showing every debtor's last visit and visit count this month (via `presentes?emails=`), to see who's still training despite owing money
 - `ModificarUsuarios` — edit member details
 - `Estadisticas` — Chart.js charts filterable by sede
+- `AsistenciaStats` — attendance charts and per-member attendance calendar
 - `Header` — real-time clock, global search, export button, logout
 
 ## Environment Variables
@@ -57,11 +74,13 @@ DATABASE_URL        # Neon pooled PostgreSQL connection string
 EMAIL_FROM          # Gmail sender address
 EMAIL_PASS          # Gmail app-specific password
 ENVIAR_QR_POR_MAIL  # "true" to enable sending QR codes by email (off by default)
+CRON_TOKEN          # shared secret required by cron routes and mails/qr-masivo.ts
+BLOB_READ_WRITE_TOKEN  # auto-injected once a Blob store is connected to the Vercel project (Storage tab); needed by /api/foto. Pull it into .env.local with `vercel env pull` for local dev
 ```
 
 ## Deployment
 
-Deployed on Vercel. `vercel.json` configures the daily cron job for `/api/cron/recordatorios`.
+Deployed on Vercel. `vercel.json` configures two daily cron jobs: `/api/cron/recordatorios` (payment reminder) and `/api/cron/recordatorio-deuda` (debt reminder, effectively every 5 days per user via the `mails_enviados` lookback — see above).
 
 ## Path Aliases
 

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import HistorialPagos from './HistorialPagos';
 import QrModal from './QrModal';
+import DeudoresAsistencia from './DeudoresAsistencia';
+import FotoUsuario from './FotoUsuario';
 
 type Usuario = {
   name: string;
@@ -8,6 +10,7 @@ type Usuario = {
   created_at: string;
   recordatorio: string;
   sede: string;
+  foto_url?: string | null;
 };
 
 type Pagos = Record<string, string[]>;
@@ -48,6 +51,7 @@ export default function ListaUsuarios() {
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const [historialUsuario, setHistorialUsuario] = useState<Usuario | null>(null);
   const [qrUsuario, setQrUsuario] = useState<Usuario | null>(null);
+  const [mostrarAsistenciaDeudores, setMostrarAsistenciaDeudores] = useState(false);
 
   const mesActual = getMesActual();
 
@@ -85,6 +89,10 @@ export default function ListaUsuarios() {
     if (sede !== 'todos' && u.sede !== sede) return false;
     return true;
   });
+
+  const actualizarFoto = (email: string, url: string) => {
+    setUsuarios(prev => prev.map(u => u.email === email ? { ...u, foto_url: url } : u));
+  };
 
   const marcarPagado = async (email: string) => {
     setIsActionLoading(email);
@@ -269,7 +277,8 @@ export default function ListaUsuarios() {
   );
   const cntPagado    = usuariosActivos.filter(u => getEstadoPago(pagos[u.email] ?? [], mesActual, parseInt(u.recordatorio ?? '1')) === 'pagado').length;
   const cntPendiente = usuariosActivos.filter(u => getEstadoPago(pagos[u.email] ?? [], mesActual, parseInt(u.recordatorio ?? '1')) === 'pendiente').length;
-  const cntDeuda     = usuariosActivos.filter(u => getEstadoPago(pagos[u.email] ?? [], mesActual, parseInt(u.recordatorio ?? '1')) === 'deuda').length;
+  const deudores     = usuariosActivos.filter(u => getEstadoPago(pagos[u.email] ?? [], mesActual, parseInt(u.recordatorio ?? '1')) === 'deuda');
+  const cntDeuda     = deudores.length;
 
   return (
     <>
@@ -282,12 +291,24 @@ export default function ListaUsuarios() {
 
       {/* Filtros */}
       <div className="bg-slate-50 rounded-2xl p-4 sm:p-6 border border-slate-200">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-          </svg>
-          Filtros
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h3 className="text-lg font-semibold text-slate-800 flex items-center">
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
+            </svg>
+            Filtros
+          </h3>
+          <button
+            onClick={() => setMostrarAsistenciaDeudores(true)}
+            disabled={cntDeuda === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+            ¿Van al gym igual? ({cntDeuda})
+          </button>
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="space-y-1">
             <label className="block text-xs font-medium text-slate-700">Estado</label>
@@ -379,9 +400,19 @@ export default function ListaUsuarios() {
                 <div key={u.email} className={`bg-white rounded-2xl border shadow-sm p-4 ${borderColor}`}>
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center min-w-0 flex-1">
-                      <div className={`w-2.5 h-2.5 rounded-full mr-2 flex-shrink-0 ${enBaja ? 'bg-gray-400' : 'bg-green-400'}`} />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-900 text-sm truncate">{u.name}</p>
+                      <FotoUsuario
+                        email={u.email}
+                        name={u.name}
+                        fotoUrl={u.foto_url}
+                        editable
+                        size="md"
+                        onFotoActualizada={(url) => actualizarFoto(u.email, url)}
+                      />
+                      <div className="min-w-0 ml-3">
+                        <div className="flex items-center gap-1.5">
+                          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${enBaja ? 'bg-gray-400' : 'bg-green-400'}`} />
+                          <p className="font-semibold text-slate-900 text-sm truncate">{u.name}</p>
+                        </div>
                         <p className="text-xs text-slate-500 truncate">{u.email}</p>
                       </div>
                     </div>
@@ -451,9 +482,19 @@ export default function ListaUsuarios() {
                       <tr key={u.email} className={`hover:bg-slate-50 transition-colors duration-200 ${rowBg}`}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <div className={`w-3 h-3 rounded-full mr-3 ${enBaja ? 'bg-gray-400' : 'bg-green-400'}`} />
-                            <div>
-                              <div className="text-sm font-semibold text-slate-900">{u.name}</div>
+                            <FotoUsuario
+                              email={u.email}
+                              name={u.name}
+                              fotoUrl={u.foto_url}
+                              editable
+                              size="sm"
+                              onFotoActualizada={(url) => actualizarFoto(u.email, url)}
+                            />
+                            <div className="ml-3">
+                              <div className="flex items-center gap-1.5">
+                                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${enBaja ? 'bg-gray-400' : 'bg-green-400'}`} />
+                                <span className="text-sm font-semibold text-slate-900">{u.name}</span>
+                              </div>
                               <div className="text-sm text-slate-500">📍 {u.sede}</div>
                             </div>
                           </div>
@@ -512,6 +553,13 @@ export default function ListaUsuarios() {
       <QrModal
         usuario={qrUsuario}
         onClose={() => setQrUsuario(null)}
+      />
+    )}
+
+    {mostrarAsistenciaDeudores && (
+      <DeudoresAsistencia
+        usuarios={deudores}
+        onClose={() => setMostrarAsistenciaDeudores(false)}
       />
     )}
     </>

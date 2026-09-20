@@ -1,6 +1,8 @@
 // pages/api/users.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
+import { enviarQrBienvenida } from '@/lib/mailer';
+import { ensureFotoColumn } from '@/lib/foto';
 
 // Asegura que todas las FK sobre usuarios.email tengan ON UPDATE CASCADE.
 // Idempotente: solo altera las constraints que aún no tienen CASCADE.
@@ -37,6 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     if (method === 'GET') {
+      await ensureFotoColumn();
       const result = await pool.query('SELECT * FROM usuarios ORDER BY created_at DESC');
       return res.status(200).json(result.rows);
     }
@@ -76,6 +79,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
          VALUES ($1, $2, $3, $4, $5)`,
         [email, name, created_at, recNum, sede]
       );
+
+      // Mail de bienvenida con el QR. No lanza: si falla, el alta ya está hecha.
+      await enviarQrBienvenida(email, name);
 
       return res.status(200).json({ success: true });
     }

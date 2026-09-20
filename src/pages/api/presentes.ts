@@ -17,7 +17,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await ensureTable();
 
     if (req.method === 'GET') {
-      const { fecha, email } = req.query;
+      const { fecha, email, emails } = req.query;
+
+      if (typeof emails === 'string') {
+        // Historial de asistencia de varios usuarios a la vez (ej. deudores),
+        // para no disparar un fetch por usuario desde el frontend.
+        const lista = emails.split(',').map(e => e.trim()).filter(Boolean);
+        if (lista.length === 0) return res.status(200).json({});
+
+        const result = await pool.query<{ email: string; fecha: Date }>(
+          `SELECT email, fecha FROM presentes WHERE email = ANY($1) ORDER BY fecha DESC`,
+          [lista]
+        );
+        const porUsuario: Record<string, string[]> = {};
+        for (const row of result.rows) {
+          const f = row.fecha.toISOString().split('T')[0];
+          (porUsuario[row.email] ??= []).push(f);
+        }
+        return res.status(200).json(porUsuario);
+      }
 
       if (email) {
         // Historial de asistencia de un usuario específico
