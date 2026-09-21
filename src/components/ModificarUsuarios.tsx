@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import FotoUsuario from './FotoUsuario';
 
 type Usuario = {
   name: string;
@@ -6,6 +8,7 @@ type Usuario = {
   created_at: string;
   recordatorio: string;
   sede: string;
+  foto_url?: string | null;
 };
 
 type Pagos = Record<string, string[]>;
@@ -32,6 +35,9 @@ export default function ModificarUsuarios({ onUserUpdated }: ModificarUsuariosPr
   const [isUpdating, setIsUpdating] = useState(false);
   const [isPaymentLoading, setIsPaymentLoading] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   // Estados del formulario de edición
   const [formData, setFormData] = useState({
@@ -69,6 +75,11 @@ export default function ModificarUsuarios({ onUserUpdated }: ModificarUsuariosPr
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const actualizarFoto = (email: string, url: string) => {
+    setUsuarios(prev => prev.map(u => u.email === email ? { ...u, foto_url: url } : u));
+    setUsuarioSeleccionado(prev => prev && prev.email === email ? { ...prev, foto_url: url } : prev);
   };
 
   const seleccionarUsuario = (usuario: Usuario) => {
@@ -147,7 +158,13 @@ export default function ModificarUsuarios({ onUserUpdated }: ModificarUsuariosPr
     }
   };
 
-  const usuariosFiltrados = usuarios.filter(u => 
+  useEffect(() => {
+    if (!showEditForm) return;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, [showEditForm]);
+
+  const usuariosFiltrados = usuarios.filter(u =>
     u.name.toLowerCase().includes(busqueda.toLowerCase()) ||
     u.email.toLowerCase().includes(busqueda.toLowerCase())
   );
@@ -170,6 +187,7 @@ export default function ModificarUsuarios({ onUserUpdated }: ModificarUsuariosPr
   }
 
   return (
+    <>
     <div className="space-y-8 animate-fade-in">
       {/* Header */}
       <div className="text-center">
@@ -304,125 +322,6 @@ export default function ModificarUsuarios({ onUserUpdated }: ModificarUsuariosPr
         })}
       </div>
 
-      {/* Modal de edición */}
-      {showEditForm && usuarioSeleccionado && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl shadow-2xl border border-white/20 p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-slate-800">
-                ✏️ Editar Usuario
-              </h3>
-              <button
-                onClick={() => {
-                  setShowEditForm(false);
-                  setUsuarioSeleccionado(null);
-                }}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleActualizarUsuario} className="space-y-6">
-              {/* Nombre */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-slate-700">
-                  Nombre completo
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Nombre completo del usuario"
-                  required
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl text-slate-900 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                />
-              </div>
-
-              {/* Email */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-slate-700">
-                  Correo electrónico
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="Email del usuario"
-                  required
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl text-slate-900 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                />
-              </div>
-
-              {/* Sede */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-slate-700">
-                  Sede
-                </label>
-                <select
-                  value={formData.sede}
-                  onChange={(e) => setFormData({ ...formData, sede: e.target.value })}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl text-slate-900 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                >
-                  <option value="Temperley">📍 Temperley</option>
-                  <option value="Calzada">📍 Calzada</option>
-                  <option value="Pension">📍 Pension</option>
-                </select>
-              </div>
-
-              {/* Recordatorio */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-slate-700">
-                  Día de recordatorio de pago
-                </label>
-                <select
-                  value={formData.recordatorio}
-                  onChange={(e) => setFormData({ ...formData, recordatorio: e.target.value })}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl text-slate-900 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                >
-                  {Array.from({ length: 28 }, (_, i) => i + 1).map(dia => (
-                    <option key={dia} value={dia}>Día {dia} del mes</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Botones */}
-              <div className="flex space-x-4 pt-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEditForm(false);
-                    setUsuarioSeleccionado(null);
-                  }}
-                  className="flex-1 bg-slate-200 text-slate-800 px-6 py-3 rounded-xl font-semibold hover:bg-slate-300 transition-all duration-200"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isUpdating}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-pink-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isUpdating ? (
-                    <div className="flex items-center justify-center space-x-2">
-                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>Actualizando...</span>
-                    </div>
-                  ) : (
-                    'Guardar Cambios'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* Mensaje si no hay usuarios */}
       {usuariosFiltrados.length === 0 && !isLoading && (
         <div className="text-center py-12">
@@ -440,5 +339,142 @@ export default function ModificarUsuarios({ onUserUpdated }: ModificarUsuariosPr
         </div>
       )}
     </div>
+
+    {mounted && showEditForm && usuarioSeleccionado && createPortal(
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+        onClick={() => { setShowEditForm(false); setUsuarioSeleccionado(null); }}
+      >
+        <div
+          className="bg-white rounded-3xl shadow-2xl border border-white/20 p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-2xl font-bold text-slate-800">
+              ✏️ Editar Usuario
+            </h3>
+            <button
+              onClick={() => {
+                setShowEditForm(false);
+                setUsuarioSeleccionado(null);
+              }}
+              className="text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="flex justify-center mb-6">
+            <FotoUsuario
+              email={usuarioSeleccionado.email}
+              name={usuarioSeleccionado.name}
+              fotoUrl={usuarioSeleccionado.foto_url}
+              editable
+              size="lg"
+              onFotoActualizada={(url) => actualizarFoto(usuarioSeleccionado.email, url)}
+            />
+          </div>
+
+          <form onSubmit={handleActualizarUsuario} className="space-y-6">
+            {/* Nombre */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-700">
+                Nombre completo
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Nombre completo del usuario"
+                required
+                className="w-full px-4 py-3 border border-slate-300 rounded-xl text-slate-900 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+              />
+            </div>
+
+            {/* Email */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-700">
+                Correo electrónico
+              </label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="Email del usuario"
+                required
+                className="w-full px-4 py-3 border border-slate-300 rounded-xl text-slate-900 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+              />
+            </div>
+
+            {/* Sede */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-700">
+                Sede
+              </label>
+              <select
+                value={formData.sede}
+                onChange={(e) => setFormData({ ...formData, sede: e.target.value })}
+                className="w-full px-4 py-3 border border-slate-300 rounded-xl text-slate-900 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+              >
+                <option value="Temperley">📍 Temperley</option>
+                <option value="Calzada">📍 Calzada</option>
+                <option value="Pension">📍 Pension</option>
+              </select>
+            </div>
+
+            {/* Recordatorio */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-700">
+                Día de recordatorio de pago
+              </label>
+              <select
+                value={formData.recordatorio}
+                onChange={(e) => setFormData({ ...formData, recordatorio: e.target.value })}
+                className="w-full px-4 py-3 border border-slate-300 rounded-xl text-slate-900 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+              >
+                {Array.from({ length: 28 }, (_, i) => i + 1).map(dia => (
+                  <option key={dia} value={dia}>Día {dia} del mes</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Botones */}
+            <div className="flex space-x-4 pt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditForm(false);
+                  setUsuarioSeleccionado(null);
+                }}
+                className="flex-1 bg-slate-200 text-slate-800 px-6 py-3 rounded-xl font-semibold hover:bg-slate-300 transition-all duration-200"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isUpdating}
+                className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-pink-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isUpdating ? (
+                  <div className="flex items-center justify-center space-x-2">
+                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Actualizando...</span>
+                  </div>
+                ) : (
+                  'Guardar Cambios'
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   );
 }

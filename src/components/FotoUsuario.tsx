@@ -6,13 +6,14 @@ type Props = {
   name: string;
   fotoUrl?: string | null;
   editable?: boolean;
-  size?: 'sm' | 'md';
+  size?: 'sm' | 'md' | 'lg';
   onFotoActualizada?: (url: string) => void;
 };
 
 const TAMANOS = {
   sm: { box: 'w-9 h-9', text: 'text-xs', badge: 'w-3.5 h-3.5' },
   md: { box: 'w-12 h-12', text: 'text-base', badge: 'w-4 h-4' },
+  lg: { box: 'w-28 h-28', text: 'text-4xl', badge: 'w-7 h-7' },
 };
 
 // Avatar circular con la foto del usuario (o sus iniciales si no tiene).

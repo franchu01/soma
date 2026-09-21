@@ -37,7 +37,9 @@ mails_enviados (id, email, nombre, asunto, fecha_envio, estado enviado|error,
 Payment status per member (`getEstadoPago` in `ListaUsuarios.tsx`, mirrored in `scan.ts`):
 `pagado` (paid this month) / `pendiente` (unpaid, `recordatorio` day hasn't hit yet) / `deuda` (unpaid, day has passed).
 
-**Profile photos** (`src/lib/foto.ts`, `src/lib/imagen.ts`, `src/components/FotoUsuario.tsx`): each member can have a profile photo, shown as a clickable avatar next to their name in `ListaUsuarios` (both the mobile cards and the desktop table) so staff can recognize faces at a glance. Clicking it opens the device camera/file picker (`<input capture="environment">`), the image is resized and re-encoded to WebP client-side (`comprimirImagen` in `lib/imagen.ts`, ~15-40KB output) before it's ever uploaded, and `POST /api/foto` (`{ email, dataUrl }`) stores it in **Vercel Blob** — not Postgres, to keep binaries and their I/O off the shared DB pool — saving only the resulting public URL in `usuarios.foto_url`. Uploading a new photo deletes the previous Blob object. Requires a Blob store connected to the Vercel project (`BLOB_READ_WRITE_TOKEN`, see below); without it `/api/foto` fails at runtime (upload only — the rest of the app is unaffected).
+**Profile photos** (`src/lib/foto.ts`, `src/lib/imagen.ts`, `src/components/FotoUsuario.tsx`): each member can have a profile photo, shown as a clickable avatar next to their name in `ListaUsuarios` (both the mobile cards and the desktop table) so staff can recognize faces at a glance. Clicking it opens the device camera/file picker (`<input capture="environment">`), the image is resized and re-encoded to WebP client-side (`comprimirImagen` in `lib/imagen.ts`, ~15-40KB output) before it's ever uploaded, and `POST /api/foto` (`{ email, dataUrl }`) stores it in **Vercel Blob** (store `soma-fotos`, public access) — not Postgres, to keep binaries and their I/O off the shared DB pool — saving only the resulting public URL in `usuarios.foto_url`. Uploading a new photo deletes the previous Blob object.
+
+The Blob store must be **connected to all three environments** (Production, Preview, Development) from the Vercel dashboard's Storage tab — connecting it auto-provisions `BLOB_STORE_ID` and enables OIDC federation for those environments, which `@vercel/blob` uses automatically (via `VERCEL_OIDC_TOKEN`, refreshed per-request on Vercel, or pulled locally with `vercel env pull`) — no static token needed day-to-day. A `BLOB_READ_WRITE_TOKEN` may also exist as a fallback but isn't the primary auth path. **Env var changes require a redeploy** — Vercel bakes them in at build time, so recreating/reconnecting the store needs `vercel --prod` (or a new commit) before production picks up the new credentials, not just a dashboard change.
 
 **Mail sending** (`src/lib/mailer.ts`): Shared Nodemailer transporter, `FROM` address, HTML templates (`qrMailHtml`, `bienvenidaMailHtml`, `recordatorioMailHtml`, `deudaMailHtml`), and `logMail`/`ensureMailsTable` helpers, so every templated mail in the app logs to `mails_enviados` the same way. `enviarQrBienvenida()` is called from `users.ts` (new member) and `bajas.ts` (reactivation) to send the welcome/QR mail — gated by `ENVIAR_QR_POR_MAIL`, and never throws (a mail failure must not block the underlying operation). The ad-hoc mail composer (`mails/enviar.ts`) is separate and keeps its own transporter since it sends free-text, not a template.
 
@@ -62,7 +64,7 @@ Both cron routes and `mails/qr-masivo.ts` require a matching `x-cron-token` head
 **Key components:**
 - `AltaUsuarios` — new member registration, optionally records first payment
 - `ListaUsuarios` — member list with payment/cancellation history; each row shows a clickable `FotoUsuario` avatar to view/update the member's photo; includes a "¿Van al gym igual?" button that opens `DeudoresAsistencia`, a modal showing every debtor's last visit and visit count this month (via `presentes?emails=`), to see who's still training despite owing money
-- `ModificarUsuarios` — edit member details
+- `ModificarUsuarios` — edit member details, including a larger editable `FotoUsuario` avatar in the edit modal. Its modal is portaled to `document.body` (`createPortal`) rather than rendered inline — a `backdrop-blur` ancestor in `index.tsx` otherwise becomes the containing block for `position: fixed`, misplacing the modal; all modals in this app must be portaled for that reason
 - `Estadisticas` — Chart.js charts filterable by sede
 - `AsistenciaStats` — attendance charts and per-member attendance calendar
 - `Header` — real-time clock, global search, export button, logout
@@ -75,7 +77,8 @@ EMAIL_FROM          # Gmail sender address
 EMAIL_PASS          # Gmail app-specific password
 ENVIAR_QR_POR_MAIL  # "true" to enable sending QR codes by email (off by default)
 CRON_TOKEN          # shared secret required by cron routes and mails/qr-masivo.ts
-BLOB_READ_WRITE_TOKEN  # auto-injected once a Blob store is connected to the Vercel project (Storage tab); needed by /api/foto. Pull it into .env.local with `vercel env pull` for local dev
+BLOB_STORE_ID        # auto-injected once a Blob store is connected to an environment; needed by /api/foto (see Profile photos above)
+VERCEL_OIDC_TOKEN    # auto-injected on Vercel; for local dev, pull with `vercel env pull .env.local` after `vercel link` (short-lived — re-pull if it expires)
 ```
 
 ## Deployment
