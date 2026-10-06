@@ -15,16 +15,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { ensureQrToken, qrPngBuffer } from '@/lib/qr';
 import {
-  transporter, FROM, ASUNTO_QR, qrMailHtml, qrAttachment,
-  ensureMailsTable, logMail, emailValido,
+  ASUNTO_QR, qrMailHtml, qrAttachment,
+  ensureMailsTable, enviarMailYRegistrar, emailValido, sleep, DELAY_ENTRE_MAILS_MS,
 } from '@/lib/mailer';
 
 const ENVIO_HABILITADO = process.env.ENVIAR_QR_POR_MAIL === 'true';
-
-// Pausa entre envíos: Gmail throttlea si se le tiran muchos seguidos.
-const DELAY_MS = 400;
-
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 type Fila = { name: string; email: string; qr_token: string };
 
@@ -89,23 +84,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Secuencial a propósito: en paralelo Gmail corta la conexión.
     for (const u of destinatarios) {
-      try {
-        const png = await qrPngBuffer(u.qr_token);
-        await transporter.sendMail({
-          from: FROM,
-          to: u.email,
-          subject: ASUNTO_QR,
-          html: qrMailHtml(u.name),
-          attachments: [qrAttachment(png)],
-        });
-        await logMail(u.email, u.name, ASUNTO_QR, 'enviado');
+      const png = await qrPngBuffer(u.qr_token);
+      const estado = await enviarMailYRegistrar({
+        to: u.email,
+        nombre: u.name,
+        asunto: ASUNTO_QR,
+        html: qrMailHtml(u.name),
+        attachments: [qrAttachment(png)],
+      });
+      if (estado === 'enviado') {
         enviados++;
-      } catch (err: any) {
-        const detalle = err?.message ?? 'Error desconocido';
-        await logMail(u.email, u.name, ASUNTO_QR, 'error', detalle);
-        errores.push({ email: u.email, detalle });
+      } else {
+        errores.push({ email: u.email, detalle: 'Ver detalle en Mails Enviados' });
       }
-      await sleep(DELAY_MS);
+      await sleep(DELAY_ENTRE_MAILS_MS);
     }
 
     return res.status(200).json({

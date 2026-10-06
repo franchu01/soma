@@ -6,8 +6,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import {
-  transporter, FROM, ASUNTO_DEUDA, deudaMailHtml,
-  ensureMailsTable, logMail, emailValido,
+  ASUNTO_DEUDA, deudaMailHtml,
+  ensureMailsTable, enviarMailYRegistrar, sleep, DELAY_ENTRE_MAILS_MS,
 } from '@/lib/mailer';
 
 // Día y mes de hoy en Buenos Aires (no UTC), igual que el resto de los crons
@@ -23,24 +23,13 @@ function hoyBuenosAires(): { dia: number; mes: string } {
   return { dia: Number(get('day')), mes: `${get('year')}-${get('month')}` };
 }
 
-async function enviarYLoguear(email: string, nombre: string) {
-  let estado: 'enviado' | 'error' = 'enviado';
-  let errorDetalle: string | null = null;
-
-  try {
-    await transporter.sendMail({
-      from: FROM,
-      to: email,
-      subject: ASUNTO_DEUDA,
-      html: deudaMailHtml(nombre),
-    });
-  } catch (err: any) {
-    estado = 'error';
-    errorDetalle = err?.message ?? 'Error desconocido';
-  }
-
-  await logMail(email, nombre, ASUNTO_DEUDA, estado, errorDetalle);
-  return estado;
+function enviarYLoguear(email: string, nombre: string) {
+  return enviarMailYRegistrar({
+    to: email,
+    nombre,
+    asunto: ASUNTO_DEUDA,
+    html: deudaMailHtml(nombre),
+  });
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -71,14 +60,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       [dia, `${mes}%`, ASUNTO_DEUDA]
     );
 
-    const destinatarios = usuarios.filter(u => emailValido(u.email));
-
-    const resultados = await Promise.all(
-      destinatarios.map(u => enviarYLoguear(u.email, u.name))
-    );
-
-    const ok = resultados.filter(r => r === 'enviado').length;
-    const fail = resultados.filter(r => r === 'error').length;
+    // Secuencial a propósito: en paralelo Gmail corta la conexión.
+    let ok = 0;
+    let fail = 0;
+    for (const u of usuarios) {
+      const estado = await enviarYLoguear(u.email, u.name);
+      if (estado === 'enviado') ok++; else fail++;
+      await sleep(DELAY_ENTRE_MAILS_MS);
+    }
 
     return res.status(200).json({ sent: ok, failed: fail, dia, mes });
   } catch (err: any) {

@@ -1,14 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import pool from '@/lib/db';
-import nodemailer from 'nodemailer';
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_FROM,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+import { enviarMailYRegistrar, sleep, DELAY_ENTRE_MAILS_MS } from '@/lib/mailer';
 
 type Destinatario = { email: string; nombre: string };
 
@@ -51,34 +42,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const errores: { email: string; error: string }[] = [];
   let enviados = 0;
 
+  // Secuencial + pausa: en paralelo Gmail corta la conexión.
   for (const dest of destinatarios) {
-    let estado: 'enviado' | 'error' = 'enviado';
-    let errorDetalle: string | null = null;
-
-    try {
-      await transporter.sendMail({
-        from: `"SOMA Gym" <${process.env.EMAIL_FROM}>`,
-        to: dest.email,
-        subject: asunto,
-        html: buildHtml(dest.nombre, mensaje),
-      });
+    const estado = await enviarMailYRegistrar({
+      to: dest.email,
+      nombre: dest.nombre,
+      asunto,
+      html: buildHtml(dest.nombre, mensaje),
+    });
+    if (estado === 'enviado') {
       enviados++;
-    } catch (err: any) {
-      estado = 'error';
-      errorDetalle = err?.message ?? 'Error desconocido';
-      errores.push({ email: dest.email, error: errorDetalle! });
+    } else {
+      errores.push({ email: dest.email, error: 'Ver detalle en Mails Enviados' });
     }
-
-    // Log every attempt
-    try {
-      await pool.query(
-        `INSERT INTO mails_enviados (email, nombre, asunto, estado, error_detalle)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [dest.email, dest.nombre, asunto, estado, errorDetalle]
-      );
-    } catch (logErr) {
-      console.error('[enviar] Error al loguear:', logErr);
-    }
+    await sleep(DELAY_ENTRE_MAILS_MS);
   }
 
   return res.status(200).json({ enviados, fallidos: errores.length, errores } as EnviarResult);

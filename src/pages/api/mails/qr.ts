@@ -10,8 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { getQrTokenByEmail, qrPngBuffer } from '@/lib/qr';
 import {
-  transporter, FROM, ASUNTO_QR as ASUNTO, qrMailHtml, qrAttachment,
-  ensureMailsTable, logMail,
+  ASUNTO_QR as ASUNTO, qrMailHtml, qrAttachment, enviarMailYRegistrar,
 } from '@/lib/mailer';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -41,27 +40,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!token) return res.status(404).json({ error: 'Usuario sin QR' });
     const png = await qrPngBuffer(token);
 
-    let estado: 'enviado' | 'error' = 'enviado';
-    let errorDetalle: string | null = null;
-
-    try {
-      await transporter.sendMail({
-        from: FROM,
-        to: email,
-        subject: ASUNTO,
-        html: qrMailHtml(nombre),
-        attachments: [qrAttachment(png)],
-      });
-    } catch (err: any) {
-      estado = 'error';
-      errorDetalle = err?.message ?? 'Error desconocido';
-    }
-
-    await ensureMailsTable();
-    await logMail(email, nombre, ASUNTO, estado, errorDetalle);
+    const estado = await enviarMailYRegistrar({
+      to: email,
+      nombre,
+      asunto: ASUNTO,
+      html: qrMailHtml(nombre),
+      attachments: [qrAttachment(png)],
+    });
 
     if (estado === 'error') {
-      return res.status(500).json({ error: errorDetalle });
+      return res.status(500).json({ error: 'No se pudo enviar el mail — ver el detalle en "Mails Enviados"' });
     }
     return res.status(200).json({ success: true });
   } catch (err: any) {

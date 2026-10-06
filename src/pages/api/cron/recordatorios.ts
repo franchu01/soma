@@ -2,8 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { qrPngBuffer, ensureQrToken } from '@/lib/qr';
 import {
-  transporter, FROM, recordatorioMailHtml, qrAttachment,
-  ensureMailsTable, logMail,
+  recordatorioMailHtml, qrAttachment,
+  ensureMailsTable, enviarMailYRegistrar, sleep, DELAY_ENTRE_MAILS_MS,
 } from '@/lib/mailer';
 
 // Día y mes de hoy en Buenos Aires (no UTC)
@@ -24,27 +24,16 @@ function hoyBuenosAires(): { dia: number; mes: string } {
 const ASUNTO = '💪 Recordatorio de pago de gimnasio';
 
 async function enviarYLoguear(email: string, nombre: string, dia: number, qrToken: string | null) {
-  let estado: 'enviado' | 'error' = 'enviado';
-  let errorDetalle: string | null = null;
-
-  try {
-    // El QR va embebido; si por algún motivo el usuario no tiene token,
-    // el recordatorio igual sale (sin la imagen).
-    const png = qrToken ? await qrPngBuffer(qrToken) : null;
-    await transporter.sendMail({
-      from: FROM,
-      to: email,
-      subject: ASUNTO,
-      html: recordatorioMailHtml(nombre, dia, png !== null),
-      attachments: png ? [qrAttachment(png)] : [],
-    });
-  } catch (err: any) {
-    estado = 'error';
-    errorDetalle = err?.message ?? 'Error desconocido';
-  }
-
-  await logMail(email, nombre, ASUNTO, estado, errorDetalle);
-  return estado;
+  // El QR va embebido; si por algún motivo el usuario no tiene token,
+  // el recordatorio igual sale (sin la imagen).
+  const png = qrToken ? await qrPngBuffer(qrToken) : null;
+  return enviarMailYRegistrar({
+    to: email,
+    nombre,
+    asunto: ASUNTO,
+    html: recordatorioMailHtml(nombre, dia, png !== null),
+    attachments: png ? [qrAttachment(png)] : [],
+  });
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -79,12 +68,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       [dia, `${mes}%`]
     );
 
-    const resultados = await Promise.all(
-      usuarios.map(u => enviarYLoguear(u.email, u.name, dia, u.qr_token))
-    );
-
-    const ok = resultados.filter(r => r === 'enviado').length;
-    const fail = resultados.filter(r => r === 'error').length;
+    // Secuencial a propósito: en paralelo Gmail corta la conexión (ver
+    // DELAY_ENTRE_MAILS_MS en lib/mailer.ts).
+    let ok = 0;
+    let fail = 0;
+    for (const u of usuarios) {
+      const estado = await enviarYLoguear(u.email, u.name, dia, u.qr_token);
+      if (estado === 'enviado') ok++; else fail++;
+      await sleep(DELAY_ENTRE_MAILS_MS);
+    }
 
     return res.status(200).json({ sent: ok, failed: fail, dia, mes });
   } catch (err: any) {
