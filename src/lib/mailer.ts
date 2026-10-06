@@ -4,7 +4,6 @@
 import nodemailer from 'nodemailer';
 import dns from 'dns';
 import pool from '@/lib/db';
-import { getQrTokenByEmail, qrPngBuffer } from '@/lib/qr';
 
 // pool + maxConnections:1 fuerza a nodemailer a reusar una única conexión
 // SMTP y a encolar internamente los envíos en vez de abrir logins en
@@ -225,44 +224,8 @@ export function bienvenidaMailHtml(nombre: string, esReactivacion: boolean): str
   `;
 }
 
-// Envía el mail de bienvenida con el QR. Pensado para llamarse desde el alta y
-// la reactivación: NUNCA lanza ni bloquea la operación principal — si el mail
-// falla, el usuario igual queda dado de alta y el error queda logueado.
-export async function enviarQrBienvenida(
-  email: string,
-  nombre: string,
-  esReactivacion = false
-): Promise<void> {
-  if (process.env.ENVIAR_QR_POR_MAIL !== 'true') return;
-
-  const asunto = esReactivacion ? ASUNTO_REACTIVACION : ASUNTO_BIENVENIDA;
-
-  try {
-    const token = await getQrTokenByEmail(email);
-    if (!token) {
-      await ensureMailsTable();
-      await logMail(email, nombre, asunto, 'error', 'Usuario sin código QR asignado');
-      return;
-    }
-    const png = await qrPngBuffer(token);
-
-    await enviarMailYRegistrar({
-      to: email,
-      nombre,
-      asunto,
-      html: bienvenidaMailHtml(nombre, esReactivacion),
-      attachments: [qrAttachment(png)],
-    });
-  } catch (err: unknown) {
-    // Solo falla acá la generación del QR (el envío ya se loguea solo).
-    const detalle = err instanceof Error ? err.message : 'Error desconocido';
-    console.error(`[mailer] Error preparando bienvenida para ${email}:`, detalle);
-    try {
-      await ensureMailsTable();
-      await logMail(email, nombre, asunto, 'error', detalle);
-    } catch { /* el log es best-effort */ }
-  }
-}
+// enviarQrBienvenida() vive en lib/reintentos.ts (necesita encolar
+// reintentos ahí, e importar desde este archivo crearía un ciclo).
 
 // Recordatorio mensual de pago, ahora con el QR adjunto para tenerlo a mano.
 // `conQr` en false omite el bloque de la imagen (si no se pudo generar el QR,

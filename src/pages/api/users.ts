@@ -1,7 +1,7 @@
 // pages/api/users.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
-import { enviarQrBienvenida } from '@/lib/mailer';
+import { enviarQrBienvenida } from '@/lib/reintentos';
 import { ensureFotoColumn } from '@/lib/foto';
 
 // Asegura que todas las FK sobre usuarios.email tengan ON UPDATE CASCADE.

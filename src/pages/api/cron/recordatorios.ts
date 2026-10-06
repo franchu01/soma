@@ -5,6 +5,7 @@ import {
   recordatorioMailHtml, qrAttachment,
   ensureMailsTable, enviarMailYRegistrar, sleep, DELAY_ENTRE_MAILS_MS,
 } from '@/lib/mailer';
+import { encolarReintento, resolverReintento } from '@/lib/reintentos';
 
 // Día y mes de hoy en Buenos Aires (no UTC)
 function hoyBuenosAires(): { dia: number; mes: string } {
@@ -27,13 +28,20 @@ async function enviarYLoguear(email: string, nombre: string, dia: number, qrToke
   // El QR va embebido; si por algún motivo el usuario no tiene token,
   // el recordatorio igual sale (sin la imagen).
   const png = qrToken ? await qrPngBuffer(qrToken) : null;
-  return enviarMailYRegistrar({
+  const estado = await enviarMailYRegistrar({
     to: email,
     nombre,
     asunto: ASUNTO,
     html: recordatorioMailHtml(nombre, dia, png !== null),
     attachments: png ? [qrAttachment(png)] : [],
   });
+
+  // Este cron solo corre una vez al mes para cada usuario (el día que le
+  // toca): si falla, sin esto no se reintentaría hasta el mes que viene.
+  if (estado === 'enviado') await resolverReintento(email, 'recordatorio');
+  else await encolarReintento(email, 'recordatorio');
+
+  return estado;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

@@ -9,6 +9,7 @@ import {
   ASUNTO_DEUDA, deudaMailHtml,
   ensureMailsTable, enviarMailYRegistrar, sleep, DELAY_ENTRE_MAILS_MS,
 } from '@/lib/mailer';
+import { procesarColaReintentos } from '@/lib/reintentos';
 
 // Día y mes de hoy en Buenos Aires (no UTC), igual que el resto de los crons
 function hoyBuenosAires(): { dia: number; mes: string } {
@@ -69,7 +70,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await sleep(DELAY_ENTRE_MAILS_MS);
     }
 
-    return res.status(200).json({ sent: ok, failed: fail, dia, mes });
+    // Se aprovecha esta misma corrida diaria para procesar la cola de
+    // reintentos de recordatorio/bienvenida/reactivación (ver lib/reintentos.ts)
+    // en vez de sumar un cron nuevo en vercel.json.
+    const cola = await procesarColaReintentos();
+
+    return res.status(200).json({ sent: ok, failed: fail, dia, mes, cola });
   } catch (err: any) {
     console.error('[CRON recordatorio-deuda] error:', err);
     return res.status(500).json({ error: 'Error interno', detail: err?.message });

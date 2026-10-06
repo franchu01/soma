@@ -1,7 +1,7 @@
 // src/pages/api/bajas.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
-import { enviarQrBienvenida } from '@/lib/mailer';
+import { enviarQrBienvenida } from '@/lib/reintentos';
 
 // Mes actual en TZ local (evita problemas de UTC)
 function mesActualYYYYMM() {
